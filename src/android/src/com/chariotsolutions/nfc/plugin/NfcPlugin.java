@@ -1093,27 +1093,12 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
 
                 nfcProtocol.connect();
                 setTimeout(timeout);
-                Log.d(TAG, "NFC Connection succesful");
+                Log.d(TAG, "NFC Connection successful");
                 callbackContext.success();
-
             } catch (IOException ex) {
                 Log.e(TAG, "Tag connection failed", ex);
                 callbackContext.error("Tag connection failed");
-
-                // Users should never get these reflection errors
-            } catch (ClassNotFoundException e) {
-                Log.e(TAG, e.getMessage(), e);
-                callbackContext.error(e.getMessage());
-            } catch (NoSuchMethodException e) {
-                Log.e(TAG, e.getMessage(), e);
-                callbackContext.error(e.getMessage());
-            } catch (IllegalAccessException e) {
-                Log.e(TAG, e.getMessage(), e);
-                callbackContext.error(e.getMessage());
-            } catch (InvocationTargetException e) {
-                Log.e(TAG, e.getMessage(), e);
-                callbackContext.error(e.getMessage());
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 Log.e(TAG, e.getMessage(), e);
                 callbackContext.error(e.getMessage());
             }
