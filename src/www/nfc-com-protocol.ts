@@ -10,7 +10,7 @@ import {
   ConnectionState,
 } from '@iotize/tap/protocol/api';
 import { QueueComProtocol } from '@iotize/tap/protocol/core';
-import { from, Observable } from 'rxjs';
+import { defer, Observable } from 'rxjs';
 
 import { CordovaInterface } from './cordova-interface';
 import { NfcError } from './errors';
@@ -57,15 +57,13 @@ export class NFCComProtocol extends QueueComProtocol {
 
   _connect(options?: ComProtocolConnectOptions): Observable<any> {
     debug('_connect', options);
-    const connectPromise = nfc.connect(
-      'android.nfc.tech.NfcV',
-      this.options.connect.timeout
+    return defer(() =>
+      nfc.connect('android.nfc.tech.NfcV', this.options.connect.timeout)
     );
-    return from(connectPromise);
   }
 
   _disconnect(options?: ComProtocolDisconnectOptions): Observable<any> {
-    return from(nfc.close());
+    return defer(() => nfc.close());
   }
 
   write(data: Uint8Array): Promise<any> {
@@ -80,9 +78,9 @@ export class NFCComProtocol extends QueueComProtocol {
     data: Uint8Array,
     options?: ComProtocolSendOptions
   ): Observable<Uint8Array> {
-    const promise = nfc
-      .transceive(bufferToHexString(data))
-      .then((response: string) => {
+    return defer(async () => {
+      try {
+        const response = await nfc.transceive(bufferToHexString(data));
         if (typeof response != 'string') {
           throw NfcError.internalError(
             `Internal error. Plugin should respond a hexadecimal string`
@@ -90,8 +88,7 @@ export class NFCComProtocol extends QueueComProtocol {
         }
         debug('NFC plugin response: ', response);
         return hexStringToBuffer(response);
-      })
-      .catch((errString) => {
+      } catch (errString) {
         if (typeof errString === 'string') {
           const error = stringToError(errString);
           if (
@@ -104,8 +101,8 @@ export class NFCComProtocol extends QueueComProtocol {
         } else {
           throw errString;
         }
-      });
-    return from(promise);
+      }
+    });
   }
 
   _onConnectionLost(error: NfcError) {
