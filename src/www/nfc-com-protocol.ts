@@ -55,22 +55,61 @@ export class NFCComProtocol extends QueueComProtocol {
     });
   }
 
+  /**
+   * We force tag connection with nfc as we need to refresh tag
+   * @param options
+   * @returns
+   */
+  connect(options?: ComProtocolConnectOptions): Observable<void> {
+    this.connectionState = ConnectionState.CONNECTING; // Hack to force NFC tag connect call even if we are already connected
+    return super.connect(options);
+  }
+
+  /**
+   * Not used as we have rewrote "connect()" function
+   * @param options
+   * @returns
+   */
   _connect(options?: ComProtocolConnectOptions): Observable<any> {
-    debug('_connect', options);
-    return defer(() =>
-      nfc.connect('android.nfc.tech.NfcV', this.options.connect.timeout)
-    );
+    return defer(async () => {
+      debug('_connect', options);
+      try {
+        await nfc.connect(
+          'android.nfc.tech.NfcV',
+          this.options.connect.timeout
+        );
+      } catch (err) {
+        if (typeof err === 'string') {
+          if (err === 'Tag connection failed') {
+            throw NfcError.tagConnectionFailed();
+          } else {
+            throw NfcError.unknownError(err);
+          }
+        }
+        throw err;
+      }
+    });
   }
 
   _disconnect(options?: ComProtocolDisconnectOptions): Observable<any> {
     return defer(() => nfc.close());
   }
 
-  write(data: Uint8Array): Promise<any> {
+  /**
+   * Not used
+   * @param options
+   * @returns
+   */
+  async write(data: Uint8Array): Promise<any> {
     throw new Error('Method not implemented.');
   }
 
-  read(): Promise<Uint8Array> {
+  /**
+   * Not used
+   * @param options
+   * @returns
+   */
+  async read(): Promise<Uint8Array> {
     throw new Error('Method not implemented.');
   }
 
