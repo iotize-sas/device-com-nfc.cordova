@@ -1,3 +1,7 @@
+# 3.2.0 2022-11-23)
+
+- Added support for Android 11 (Android target sdk 31)
+
 ## 3.1.4 (2022-03-22)
 
 ### Bug Fixes

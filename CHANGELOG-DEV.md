@@ -1,3 +1,7 @@
+# [3.2.0](https://github.com/iotize-sas/device-com-nfc.cordova/compare/v3.1.6...v3.2.0) (2022-11-23)
+
+
+
 ## [3.1.4](https://github.com/iotize-sas/device-com-nfc.cordova/compare/v3.1.3...v3.1.4) (2022-03-22)
 
 
