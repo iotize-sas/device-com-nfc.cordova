@@ -1,3 +1,9 @@
+## 3.2.1 (2023-02-20)
+
+### Others
+
+- Updated dependency `org.apache.commons:commons-collections4:4.1` to `org.apache.commons:commons-collections4:4.4`
+
 # 3.2.0 2022-11-23)
 
 - Added support for Android 11 (Android target sdk 31)
