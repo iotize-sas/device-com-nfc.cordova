@@ -894,8 +894,12 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
     }
 
     private void fireNdefEvent(String type, Ndef ndef, Parcelable[] messages) {
-        JSONObject json = buildNdefJSON(ndef, messages);
-        sendEvent(type, json);
+        try {
+            JSONObject json = buildNdefJSON(ndef, messages);
+            sendEvent(type, json);
+        } catch (Throwable e) {
+            Log.w(TAG, "Failed to fire NDef event", e);
+        }
     }
 
     private void fireTapDeviceEvent(IoTizeDevice tap, Intent intent) {
@@ -908,6 +912,8 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
             sendEvent(NFC_TAP_DEVICE, buildNdefJSON(ndef, messages), buildTapJSON(tap));
         } catch (JSONException e) {
             Log.e(TAG, e.getMessage(), e);
+        } catch (Throwable e) {
+            Log.w(TAG, "Failed to fire Tap Device event", e);
         }
     }
 
@@ -956,7 +962,10 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
         sendEvent(TAG_DEFAULT, Util.tagToJSON(tag));
     }
 
-    private JSONObject buildNdefJSON(Ndef ndef, Parcelable[] messages) {
+    /**
+     * May throw a java.lang.SecurityException error if Tag is out of date (tested on Android 13)
+     */
+    private JSONObject buildNdefJSON(Ndef ndef, Parcelable[] messages) throws SecurityException {
 
         JSONObject json = Util.ndefToJSON(ndef);
 
