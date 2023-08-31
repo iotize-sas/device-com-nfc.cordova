@@ -1,3 +1,12 @@
+## [3.2.2](https://github.com/iotize-sas/device-com-nfc.cordova/compare/v3.2.1...v3.2.2) (2023-08-31)
+
+
+### Bug Fixes
+
+* catch `SecurityException` fatal error when Tag is out of date on Android 372e386
+
+
+
 ## [3.2.1](https://github.com/iotize-sas/device-com-nfc.cordova/compare/v3.2.0...v3.2.1) (2023-02-20)
 
 
