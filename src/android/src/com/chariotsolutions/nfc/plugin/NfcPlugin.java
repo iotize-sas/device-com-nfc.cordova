@@ -62,10 +62,12 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
     private static final String WRITE_TAG = "writeTag";
     private static final String MAKE_READ_ONLY = "makeReadOnly";
     private static final String ERASE_TAG = "eraseTag";
+/* Remove unused and deprecated methods
     private static final String SHARE_TAG = "shareTag";
     private static final String UNSHARE_TAG = "unshareTag";
     private static final String HANDOVER = "handover"; // Android Beam
     private static final String STOP_HANDOVER = "stopHandover";
+*/
     private static final String ENABLED = "enabled";
     private static final String INIT = "init";
     private static final String SHOW_SETTINGS = "showSettings";
@@ -189,7 +191,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
 
         } else if (action.equalsIgnoreCase(ERASE_TAG)) {
             eraseTag(callbackContext);
-
+/* Remove unused and deprecated methods
         } else if (action.equalsIgnoreCase(SHARE_TAG)) {
             shareTag(data, callbackContext);
 
@@ -201,7 +203,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
 
         } else if (action.equalsIgnoreCase(STOP_HANDOVER)) {
             stopHandover(callbackContext);
-
+*/
         } else if (action.equalsIgnoreCase(INIT)) {
             init(callbackContext);
 
@@ -373,6 +375,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
         restartNfc();
         callbackContext.success();
     }
+/* Remove unused and deprecated methods
 
     private void unshareTag(CallbackContext callbackContext) {
         p2pMessage = null;
@@ -380,7 +383,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
         shareTagCallback = null;
         callbackContext.success();
     }
-
+*/
     private void init(CallbackContext callbackContext) {
         Log.d(TAG, "Enabling plugin " + getIntent());
 
@@ -556,7 +559,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
             }
         });
     }
-
+/* Remove unused and deprecated methods
     private void shareTag(JSONArray data, CallbackContext callbackContext) throws JSONException {
         NdefRecord[] records = Util.jsonToNdefRecords(data.getString(0));
         this.p2pMessage = new NdefMessage(records);
@@ -585,7 +588,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
         handoverCallback = null;
         callbackContext.success();
     }
-
+*/
     private void showSettings(CallbackContext callbackContext) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN) {
             Intent intent = new Intent(android.provider.Settings.ACTION_NFC_SETTINGS);
