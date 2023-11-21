@@ -1,3 +1,10 @@
+# 3.3.0 (2023-11-21)
+
+### Features
+
+- Added support for `rxjs@7`
+- Removed deprecated `@ionic-native/nfc` in `peerDependencies`
+
 ## 3.2.4 (2023-08-31)
 
 ### Bug Fixes
