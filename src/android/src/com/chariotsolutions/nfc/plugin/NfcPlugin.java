@@ -16,6 +16,7 @@ import android.nfc.Tag;
 import android.nfc.TagLostException;
 import android.nfc.tech.Ndef;
 import android.nfc.tech.NdefFormatable;
+import android.nfc.tech.TagTechnology;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.util.Log;
@@ -41,6 +42,7 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -81,6 +83,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
     // TagTechnology IsoDep, NfcA, NfcB, NfcV, NfcF, MifareClassic, MifareUltralight
     private static final String CONNECT = "connect";
     private static final String CLOSE = "close";
+    private static final String TRANSCEIVE_TAP = "transceiveTap";
     private static final String TRANSCEIVE = "transceive";
 
     private static final String NFC_TAP_DEVICE = "nfc-tap-device";
@@ -91,9 +94,11 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
     private static final String PREF_NFC_PAIRING_DONE_TOAST_MESSAGE = "NFCParingDoneToastMessage";
     private static final String REGISTER_NFC_TAP_DEVICE = "registerTapDevice";
 
-//    @Nullable
-//    private TagTechnology tagTechnology = null;
-//    private Class<?> tagTechnologyClass;
+    @Nullable
+    private TagTechnology tagTechnology = null;
+
+    @Nullable
+    private Class<?> tagTechnologyClass;
 
     private static final String CHANNEL = "channel";
 
@@ -219,7 +224,13 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
             CordovaArgs args = new CordovaArgs(data); // execute is using the old signature with JSON data
 
             byte[] command = args.getArrayBuffer(0);
-            transceive(command, callbackContext);
+            transceiveRaw(command, callbackContext);
+
+        } else if (action.equalsIgnoreCase(TRANSCEIVE_TAP)) {
+            CordovaArgs args = new CordovaArgs(data); // execute is using the old signature with JSON data
+
+            byte[] command = args.getArrayBuffer(0);
+            transceiveTap(command, callbackContext);
 
         } else if (action.equalsIgnoreCase(CLOSE)) {
             close(callbackContext);
@@ -1077,29 +1088,9 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
                          final CallbackContext callbackContext) {
         this.cordova.getThreadPool().execute(() -> {
             try {
+                this._connectToIntentTag(tech);
 
-                Tag tag = getIntent().getParcelableExtra(NfcAdapter.EXTRA_TAG);
-                if (tag == null) {
-                    tag = savedIntent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
-                }
-
-                if (tag == null) {
-                    Log.e(TAG, "No Tag");
-                    callbackContext.error("No Tag");
-                    return;
-                }
-
-                // get technologies supported by this tag
-                List<String> techList = Arrays.asList(tag.getTechList());
-                if (techList.contains(tech)) {
-                    // use reflection to call the static function Tech.get(tag)
-//                    tagTechnologyClass = Class.forName(tech);
-                    nfcProtocol = NFCProtocol.create(tag);
-//                    Method method = tagTechnologyClass.getMethod("get", Tag.class);
-//                    tagTechnology = (TagTechnology) method.invoke(null, tag);
-                }
-
-                if (nfcProtocol == null) {
+                if (nfcProtocol == null) {        
                     callbackContext.error("Tag does not support " + tech);
                     return;
                 }
@@ -1116,6 +1107,37 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
                 callbackContext.error(e.getMessage());
             }
         });
+    }
+
+    private void _connectToIntentTag() throws Exception {
+        this._connectToIntentTag("android.nfc.tech.NfcV"); // TODO
+    }
+
+    private void _connectToIntentTag(final String tech) throws Exception {
+        Intent intent = getIntent();
+        Tag tag = null;
+        if (intent != null) {
+            tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+        }
+        if (tag == null) {
+            tag = savedIntent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+        }
+
+        if (tag == null) {
+            Log.e(TAG, "No Tag");
+            throw new Exception("No Tag");
+        }
+
+        // get technologies supported by this tag
+        List<String> techList = Arrays.asList(tag.getTechList());
+        if (!techList.contains(tech)) {
+            throw new Exception("Tech " + tech + " not available");
+        }
+        // use reflection to call the static function Tech.get(tag)
+        tagTechnologyClass = Class.forName(tech);
+        nfcProtocol = NFCProtocol.create(tag);
+        Method method = tagTechnologyClass.getMethod("get", Tag.class);
+        tagTechnology = (TagTechnology) method.invoke(null, tag);
     }
 
     private void setTimeout(int timeout) {
@@ -1144,6 +1166,11 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
                 Log.e(TAG, "Error closing nfc connection", ex);
                 callbackContext.error("Error closing nfc connection " + ex.getLocalizedMessage());
             }
+            finally {
+                nfcProtocol = null;
+                tagTechnology = null;
+                tagTechnologyClass = null;
+            }
         });
     }
 
@@ -1153,7 +1180,56 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
      * @param data            byte[] command to be passed to the tag
      * @param callbackContext Cordova callback context
      */
-    private void transceive(final byte[] data, final CallbackContext callbackContext) {
+    private void transceiveRaw(final byte[] data, final CallbackContext callbackContext) {
+        cordova.getThreadPool().execute(() -> {
+            try {
+                this._connectToIntentTagIfNeeded();
+                Method transceiveMethod = tagTechnologyClass.getMethod("transceive", byte[].class);
+                try {
+                    @SuppressWarnings("PrimitiveArrayArgumentToVarargsMethod")
+                    byte[] response = (byte[]) transceiveMethod.invoke(tagTechnology, data);
+                    callbackContext.success(Helper.ByteArrayToHexString(response));
+                }
+                catch (InvocationTargetException e) {
+                    Throwable targetException = e.getTargetException();
+                    String errorMessage = targetException.getMessage();
+                    if (errorMessage != null && (errorMessage.endsWith("is out of date") ||
+                            errorMessage.endsWith("Call connect() first"))) {
+                        this._connectToIntentTag();
+                        // Retry
+                        byte[] response = (byte[]) transceiveMethod.invoke(tagTechnology, data);
+                        callbackContext.success(Helper.ByteArrayToHexString(response));
+                    }
+                    else {
+                        throw e;
+                    }
+                }
+            }
+            catch (InvocationTargetException e) {
+                String msg = e.getTargetException().getMessage();
+                Log.e(TAG, msg, e);
+                callbackContext.error(msg);
+            }
+            catch (Throwable e) {
+                Log.e(TAG, e.getMessage(), e);
+                callbackContext.error(e.getMessage());
+            }
+        });
+    }
+
+    private void _connectToIntentTagIfNeeded() throws Exception {
+        if (tagTechnology == null) {
+            this._connectToIntentTag();
+        }
+    }
+
+    /**
+     * Send raw commands to the tag and receive the response.
+     *
+     * @param data            byte[] command to be passed to the tag
+     * @param callbackContext Cordova callback context
+     */
+    private void transceiveTap(final byte[] data, final CallbackContext callbackContext) {
         cordova.getThreadPool().execute(() -> {
             try {
                 if (nfcProtocol == null) {
@@ -1166,11 +1242,6 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
                     callbackContext.error("Not connected");
                     return;
                 }
-
-                // Use reflection so we can support many tag types
-                //Method transceiveMethod = tagTechnologyClass.getMethod("transceive", byte[].class);
-//                @SuppressWarnings("PrimitiveArrayArgumentToVarargsMethod")
-//                byte[] response = (byte[]) transceiveMethod.invoke(tagTechnology, data);
                 byte[] response = nfcProtocol.send(data);
                 callbackContext.success(Helper.ByteArrayToHexString(response));
             } catch (Exception e) {
@@ -1179,5 +1250,4 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
             }
         });
     }
-
 }

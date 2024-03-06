@@ -411,10 +411,10 @@ var ndef = {
 // nfc provides javascript wrappers to the native phonegap implementation
 var nfc = {
     
-    // addTagDiscoveredListener: function (callback, win, fail) {
-    //     document.addEventListener("tag", callback, false);
-    //     cordova.exec(win, fail, "NfcPlugin", "registerTag", []);
-    // },
+    addTagDiscoveredListener: function (callback, win, fail) {
+         document.addEventListener("tag", callback, false);
+         cordova.exec(win, fail, "NfcPlugin", "registerTag", []);
+    },
 
     addMimeTypeListener: function (mimeType, callback, win, fail) {
         document.addEventListener("ndef-mime", callback, false);
@@ -434,51 +434,51 @@ var nfc = {
         // ]);
     },
 
-    // addNdefFormatableListener: function (callback, win, fail) {
-    //     document.addEventListener("ndef-formatable", callback, false);
-    //     cordova.exec(win, fail, "NfcPlugin", "registerNdefFormatable", []);
-    // },
+    addNdefFormatableListener: function (callback, win, fail) {
+        document.addEventListener("ndef-formatable", callback, false);
+        cordova.exec(win, fail, "NfcPlugin", "registerNdefFormatable", []);
+    },
 
-    // write: function (ndefMessage, win, fail) {
-    //     cordova.exec(win, fail, "NfcPlugin", "writeTag", [ndefMessage]);
-    // },
+    write: function (ndefMessage, win, fail) {
+        cordova.exec(win, fail, "NfcPlugin", "writeTag", [ndefMessage]);
+    },
 
-    // makeReadOnly: function (win, fail) {
-    //     cordova.exec(win, fail, "NfcPlugin", "makeReadOnly", []);
-    // },
+    makeReadOnly: function (win, fail) {
+        cordova.exec(win, fail, "NfcPlugin", "makeReadOnly", []);
+    },
 
-    // share: function (ndefMessage, win, fail) {
-    //     cordova.exec(win, fail, "NfcPlugin", "shareTag", [ndefMessage]);
-    // },
+    share: function (ndefMessage, win, fail) {
+        cordova.exec(win, fail, "NfcPlugin", "shareTag", [ndefMessage]);
+    },
 
-    // unshare: function (win, fail) {
-    //     cordova.exec(win, fail, "NfcPlugin", "unshareTag", []);
-    // },
+    unshare: function (win, fail) {
+        cordova.exec(win, fail, "NfcPlugin", "unshareTag", []);
+    },
 
-    // handover: function (uris, win, fail) {
-    //     // if we get a single URI, wrap it in an array
-    //     if (!Array.isArray(uris)) {
-    //         uris = [ uris ];
-    //     }
-    //     cordova.exec(win, fail, "NfcPlugin", "handover", uris);
-    // },
+    handover: function (uris, win, fail) {
+        // if we get a single URI, wrap it in an array
+        if (!Array.isArray(uris)) {
+            uris = [ uris ];
+        }
+        cordova.exec(win, fail, "NfcPlugin", "handover", uris);
+    },
 
-    // stopHandover: function (win, fail) {
-    //     cordova.exec(win, fail, "NfcPlugin", "stopHandover", []);
-    // },
+    stopHandover: function (win, fail) {
+        cordova.exec(win, fail, "NfcPlugin", "stopHandover", []);
+    },
 
-    // erase: function (win, fail) {
-    //     cordova.exec(win, fail, "NfcPlugin", "eraseTag", [[]]);
-    // },
+    erase: function (win, fail) {
+        cordova.exec(win, fail, "NfcPlugin", "eraseTag", [[]]);
+    },
 
     enabled: function (win, fail) {
         cordova.exec(win, fail, "NfcPlugin", "enabled", [[]]);
     },
 
-    // removeTagDiscoveredListener: function (callback, win, fail) {
-    //     document.removeEventListener("tag", callback, false);
-    //     cordova.exec(win, fail, "NfcPlugin", "removeTag", []);
-    // },
+    removeTagDiscoveredListener: function (callback, win, fail) {
+        document.removeEventListener("tag", callback, false);
+        cordova.exec(win, fail, "NfcPlugin", "removeTag", []);
+    },
 
     removeMimeTypeListener: function(mimeType, callback, win, fail) {
         document.removeEventListener("ndef-mime", callback, false);
@@ -520,6 +520,26 @@ var nfc = {
 
     // data - ArrayBuffer or string of hex data for transcieve
     // the results of transcieve are returned in the promise success as an ArrayBuffer
+    transceiveTap: function(data) {
+        return new Promise(function(resolve, reject) {
+
+            var buffer;
+            if (typeof data === 'string') {
+                buffer = util.hexStringToArrayBuffer(data);
+            } else if (data instanceof ArrayBuffer) {
+                buffer = data;
+            } else if (data instanceof Uint8Array) {
+                buffer = data.buffer;
+            } else {
+                reject("Expecting an ArrayBuffer or String");
+            }
+
+            cordova.exec(resolve, reject, 'NfcPlugin', 'transceiveTap', [buffer]);
+        });
+    },
+
+    // data - ArrayBuffer or string of hex data for transcieve
+    // the results of transcieve are returned in the promise success as an ArrayBuffer
     transceive: function(data) {
         return new Promise(function(resolve, reject) {
 
@@ -548,13 +568,13 @@ var nfc = {
     // FLAG_READER_NO_PLATFORM_SOUNDS: 0x100,
     
     // // Android NfcAdapter.enabledReaderMode
-    // readerMode: function(flags, readCallback, errorCallback) {
-    //     cordova.exec(readCallback, errorCallback, 'NfcPlugin', 'readerMode', [flags]);
-    // },
+    readerMode: function(flags, readCallback, errorCallback) {
+         cordova.exec(readCallback, errorCallback, 'NfcPlugin', 'readerMode', [flags]);
+    },
 
-    // disableReaderMode: function(successCallback, errorCallback) {
-    //     cordova.exec(successCallback, errorCallback, 'NfcPlugin', 'disableReaderMode', []);
-    // }
+    disableReaderMode: function(successCallback, errorCallback) {
+         cordova.exec(successCallback, errorCallback, 'NfcPlugin', 'disableReaderMode', []);
+    }
 
 };
 

@@ -119,7 +119,7 @@ export class NFCComProtocol extends QueueComProtocol {
   ): Observable<Uint8Array> {
     return defer(async () => {
       try {
-        const response = await nfc.transceive(bufferToHexString(data));
+        const response = await nfc.transceiveTap(bufferToHexString(data));
         if (typeof response != 'string') {
           throw NfcError.internalError(
             `Internal error. Plugin should respond a hexadecimal string`
