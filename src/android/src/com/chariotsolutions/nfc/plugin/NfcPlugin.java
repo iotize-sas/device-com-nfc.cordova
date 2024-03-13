@@ -93,6 +93,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
     private static final String PREF_ENABLE_ENCRYPTION_WITH_NFC = "EnableEncryptionWithNFC";
     private static final String PREF_NFC_PAIRING_DONE_TOAST_MESSAGE = "NFCParingDoneToastMessage";
     private static final String REGISTER_NFC_TAP_DEVICE = "registerTapDevice";
+    private static final String SET_TAP_DEVICE_DISCOVERY_ENABLED = "setTapDeviceDiscoveryEnabled";
 
     @Nullable
     private TagTechnology tagTechnology = null;
@@ -129,10 +130,12 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
     @Nullable
     private Intent mLastTapDiscoveredIntent;
 
+    private boolean _isTapDeviceDiscoveryEnabled = true;
+
     @Override
     public boolean execute(String action, JSONArray data, CallbackContext callbackContext) throws JSONException {
 
-        Log.d(TAG, "execute " + action);
+            Log.d(TAG, "execute " + action);
 
         // showSettings can be called if NFC is disabled
         // might want to skip this if NO_NFC
@@ -235,8 +238,12 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
         } else if (action.equalsIgnoreCase(CLOSE)) {
             close(callbackContext);
 
+        } else if (action.equalsIgnoreCase(SET_TAP_DEVICE_DISCOVERY_ENABLED)) {
+            CordovaArgs args = new CordovaArgs(data);
+            this._isTapDeviceDiscoveryEnabled = args.getBoolean(0);
         } else {
             // invalid action
+            callbackContext.error("Invalid NFC action \"" + action +"\"");
             return false;
         }
 
@@ -451,7 +458,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
     }
 
     private boolean isTapDeviceDiscoveryEnabled() {
-        return preferences.getBoolean(PREF_ENABLE_TAP_DEVICE_DISCOVERY, false);
+        return this._isTapDeviceDiscoveryEnabled && preferences.getBoolean(PREF_ENABLE_TAP_DEVICE_DISCOVERY, false);
     }
 
     // Cheating and writing an empty record. We may actually be able to erase some tag types.
@@ -837,7 +844,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
             Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
             Parcelable[] messages = intent.getParcelableArrayExtra((NfcAdapter.EXTRA_NDEF_MESSAGES));
 
-            if (isTapDeviceDiscoveryEnabled() && tag != null) {
+            if (isTapDeviceDiscoveryEnabled() && isIoTizeTag(tag)) {
                 onTapDeviceDiscoveredIntent(intent);
             }
 
@@ -867,8 +874,25 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
         });
     }
 
-    private boolean notifyWhenNfcPairingDone() {
-        return true; // TODO
+    private boolean isIoTizeTag(@Nullable Tag tag) {
+        if (tag == null) {
+            return false;
+        }
+        boolean hasNfcV = Arrays.stream(tag.getTechList()).anyMatch(s -> s.endsWith("NfcV"));
+        if (!hasNfcV) {
+            return false;
+        }
+        Ndef ndef = Ndef.get(tag);
+        if (ndef == null) {
+            return false;
+        }
+        NdefMessage ndefMessages = ndef.getCachedNdefMessage();
+        if (ndefMessages == null) {
+            return false;
+        }
+        NdefRecord[] records = ndefMessages.getRecords();
+
+        return records.length > 0;
     }
 
     private void sendEvent(String type, JSONObject tag, JSONObject tap) {
@@ -1088,7 +1112,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
                          final CallbackContext callbackContext) {
         this.cordova.getThreadPool().execute(() -> {
             try {
-                this._connectToIntentTag(tech);
+                this._initIntentTag(tech);
 
                 if (nfcProtocol == null) {        
                     callbackContext.error("Tag does not support " + tech);
@@ -1109,17 +1133,17 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
         });
     }
 
-    private void _connectToIntentTag() throws Exception {
-        this._connectToIntentTag("android.nfc.tech.NfcV"); // TODO
+    private void _initIntentTag() throws Exception {
+        this._initIntentTag("android.nfc.tech.NfcV"); // TODO
     }
 
-    private void _connectToIntentTag(final String tech) throws Exception {
+    private void _initIntentTag(final String tech) throws Exception {
         Intent intent = getIntent();
         Tag tag = null;
         if (intent != null) {
             tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
         }
-        if (tag == null) {
+        if (tag == null && savedIntent != null) {
             tag = savedIntent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
         }
 
@@ -1138,6 +1162,10 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
         nfcProtocol = NFCProtocol.create(tag);
         Method method = tagTechnologyClass.getMethod("get", Tag.class);
         tagTechnology = (TagTechnology) method.invoke(null, tag);
+        if (tagTechnology == null) {
+            Log.e(TAG, "No Tag Technology");
+            throw new Exception("No Tag");
+        }
     }
 
     private void setTimeout(int timeout) {
@@ -1183,7 +1211,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
     private void transceiveRaw(final byte[] data, final CallbackContext callbackContext) {
         cordova.getThreadPool().execute(() -> {
             try {
-                this._connectToIntentTagIfNeeded();
+                this._connectIntentTagIfNeeded();
                 Method transceiveMethod = tagTechnologyClass.getMethod("transceive", byte[].class);
                 try {
                     @SuppressWarnings("PrimitiveArrayArgumentToVarargsMethod")
@@ -1194,8 +1222,8 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
                     Throwable targetException = e.getTargetException();
                     String errorMessage = targetException.getMessage();
                     if (errorMessage != null && (errorMessage.endsWith("is out of date") ||
-                            errorMessage.endsWith("Call connect() first"))) {
-                        this._connectToIntentTag();
+                            errorMessage.contains("Call connect() first"))) {
+                        this._connectIntentTag();
                         // Retry
                         byte[] response = (byte[]) transceiveMethod.invoke(tagTechnology, data);
                         callbackContext.success(Helper.ByteArrayToHexString(response));
@@ -1217,9 +1245,15 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
         });
     }
 
-    private void _connectToIntentTagIfNeeded() throws Exception {
+    private void _connectIntentTag() throws Exception {
+        this._initIntentTag();
+        tagTechnology.connect();
+    }
+
+    private void _connectIntentTagIfNeeded() throws Exception {
         if (tagTechnology == null) {
-            this._connectToIntentTag();
+            this._initIntentTag();
+            tagTechnology.connect();
         }
     }
 

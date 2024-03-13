@@ -574,7 +574,13 @@ var nfc = {
 
     disableReaderMode: function(successCallback, errorCallback) {
          cordova.exec(successCallback, errorCallback, 'NfcPlugin', 'disableReaderMode', []);
-    }
+    },
+
+    setTapDeviceDiscoveryEnabled: function(enabled) {
+        return new Promise(function(resolve, reject) {
+            cordova.exec(resolve, reject, 'NfcPlugin', 'setTapDeviceDiscoveryEnabled', [!!enabled]);
+        });
+   }
 
 };
 

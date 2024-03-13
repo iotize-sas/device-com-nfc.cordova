@@ -29,4 +29,6 @@ export interface CordovaInterface {
    * @param data ArrayBuffer or string of hex data for transcieve
    */
   transceive(data: ArrayBuffer | string): Promise<string>;
+
+  setTapDeviceDiscoveryEnabled(value: boolean): Promise<void>;
 }
