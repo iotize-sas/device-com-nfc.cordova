@@ -99,7 +99,7 @@ class ST25DVReader : NSObject {
         
         let requestData : Data = request.dataFromHexString()
         print( "Transceive - \(requestData.hexEncodedString())" )
-        transceive(request: requestData,
+        transceiveTap(request: requestData,
                    completed: { ( response: Data?, error: Error?) in
                             if nil != error {
                                 self.invalidateSession( message: error?.localizedDescription ?? "Error" )
@@ -185,7 +185,7 @@ extension ST25DVReader {
     
     
 
-    func transceive(request: Data, completed: @escaping (Data?, Error?)->()){
+    func transceiveTap(request: Data, completed: @escaping (Data?, Error?)->()){
        
 
         checkMBEnabled( completed: { ( error: Error?) in
@@ -371,6 +371,34 @@ extension ST25DVReader {
                 }
                 
             })
+    }
+    
+    //full transparent mode
+    
+    @available(iOS 14.0, *)
+    func transceiveRaw(request: Data, completed: @escaping (Data?, Error?) -> ()) {
+        guard (request.count < 2) else {
+            completed(nil, NFCReaderError(NFCReaderError.readerErrorInvalidParameterLength))
+            return
+        }
+        var flags = Int(request[0])
+        var commandCode = Int(request[1])
+        var dataToSend = request.dropFirst(2)
+        self.tag?.sendRequest(requestFlags: flags, commandCode: commandCode, data: dataToSend, resultHandler: {(result: Result<(NFCISO15693ResponseFlag, Data?), any Error>) in
+            switch result {
+            case .success((let flag, let data)):
+                let firstByteBuffer = withUnsafeBytes(of: flag.rawValue) { Data($0)}
+                var resultData = Data(firstByteBuffer)
+                if let nonNilData = data {
+                    resultData.append(nonNilData)
+                }
+                completed(resultData, nil)
+                return
+            case .failure(let error):
+                completed(nil, error)
+                return
+            }
+        })
     }
 }
     

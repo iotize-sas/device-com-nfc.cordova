@@ -62,7 +62,7 @@ import CoreNFC
             return
         }
         DispatchQueue.main.async {
-            print("Begin session \(self.nfcController)")
+            print("Begin session \(String(describing: self.nfcController))")
             if self.nfcController == nil {
                 self.nfcController = ST25DVReader()
             }
@@ -98,8 +98,8 @@ import CoreNFC
         }
     }
 
-    @objc(transceive:)
-    func transceive(command: CDVInvokedUrlCommand) {
+    @objc(transceiveTap:)
+    func transceiveTap(command: CDVInvokedUrlCommand) {
         guard #available(iOS 13.0, *) else {
             sendError(command: command, result: "transceive is only available on iOS 13+")
             return
@@ -247,5 +247,47 @@ import CoreNFC
         }
         let enabled = NFCReaderSession.readingAvailable
         sendSuccess(command: command, result: enabled)
+    }
+    
+    //full transparent mode
+    @objc(transceive:)
+    func transceive(command: CDVInvokedUrlCommand) {
+        guard #available(iOS 14.0, *) else {
+            sendError(command: command, result: "Tranparent transceive is only available in iOS 14+")
+            return
+        }
+        
+        DispatchQueue.main.async {
+            print("sending ...")
+            if self.nfcController == nil {
+                self.sendError(command: command, result: "no session available")
+                return
+            }
+
+            // we need data to send
+            if command.arguments.count <= 0 {
+                self.sendError(command: command, result: "SendRequest parameter error")
+                return
+            }
+
+            guard let data: Data = command.arguments[0] as? Data else {
+                self.sendError(command: command, result: "Tried to transceive empty buffer")
+                return
+            }
+
+            (self.nfcController as! ST25DVReader).transceiveRaw(request: data, completed: {
+                (response: Data?, error: Error?) -> Void in
+
+                DispatchQueue.main.async {
+                    if error != nil {
+                        self.lastError = error
+                        self.sendError(command: command, result: error!.localizedDescription)
+                    } else {
+                        print("responded \(response!.hexEncodedString())")
+                        self.sendSuccess(command: command, result: response!.hexEncodedString())
+                    }
+                }
+            })
+        }
     }
 }
