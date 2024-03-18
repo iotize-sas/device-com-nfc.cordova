@@ -57,6 +57,7 @@ import CoreNFC
 
     @objc(connect:)
     func connect(command: CDVInvokedUrlCommand) {
+        print("CONNECT NFC")
         guard #available(iOS 13.0, *) else {
             sendError(command: command, result: "connect is only available on iOS 13+")
             return
@@ -67,7 +68,7 @@ import CoreNFC
                 self.nfcController = ST25DVReader()
             }
 
-            (self.nfcController as! ST25DVReader).initSession(alertMessage: "Bring your phone close to the Tap.", completed: {
+            (self.nfcController as! ST25DVReader).initSession(pollingOption: [.iso15693], alertMessage: "Bring your phone close to the Tap.", completed: {
                 (error: Error?) -> Void in
 
                 DispatchQueue.main.async {
@@ -93,7 +94,7 @@ import CoreNFC
                 return
             }
 
-            (self.nfcController as! ST25DVReader).invalidateSession(message: "Sesssion Ended!")
+            (self.nfcController as! NFCTagReader).invalidateSession(message: "Sesssion Ended!")
             self.nfcController = nil
         }
     }
@@ -139,6 +140,13 @@ import CoreNFC
                 }
             })
         }
+    }
+    
+    @objc(registerTag:)
+    func registerTag(command: CDVInvokedUrlCommand) {
+        print("Registered NDEF Listener")
+        //isListeningNDEF = true // Flag for the AppDelegate
+        sendSuccess(command: command, result: "Tag Listener is on")
     }
 
     @objc(registerNdef:)
@@ -266,7 +274,7 @@ import CoreNFC
 
             // we need data to send
             if command.arguments.count <= 0 {
-                self.sendError(command: command, result: "SendRequest parameter error")
+                self.sendError(command: command, result: "transceive parameter error")
                 return
             }
 
@@ -288,6 +296,81 @@ import CoreNFC
                     }
                 }
             })
+        }
+    }
+    
+    @objc(beginSessionFromTech:)
+    func beginSessionFromTech(command: CDVInvokedUrlCommand) {
+        
+//        self.nfcController = nil // Clear previous session, if any
+        
+        guard #available(iOS 13.0, *) else {
+            sendError(command: command, result: "NFC Tag Session is only available in iOS 13+")
+            return
+        }
+        // we need data to send
+        if command.arguments.count <= 0 {
+            self.sendError(command: command, result: "beginSessionFromTech parameter error: missing tech")
+            return
+        }
+
+        guard let tech = command.argument(at: 0) as? String else {
+            self.sendError(command: command, result: "beginSessionFromTech parameter error: improper tech")
+            return
+        }
+        switch tech {
+        case "nfcV":
+            DispatchQueue.main.async {
+                print("Begin session \(String(describing: self.nfcController))")
+                if self.nfcController == nil {
+                    self.nfcController = ST25DVReader()
+                }
+
+                (self.nfcController as! ST25DVReader).initSession(pollingOption: [.iso15693], alertMessage: "Begin nfcV Session.", completed: {
+                    (error: Error?) -> Void in
+
+                    DispatchQueue.main.async {
+                        if error != nil {
+                            print("onBeginSessionFromTech error \(error!.localizedDescription)")
+                            self.sendError(command: command, result: error!.localizedDescription)
+                        } else {
+                            print("onBeginSessionFromTech sucess")
+                            self.sendSuccess(command: command, result: "nfcV session started")
+                        }
+                    }
+                }, onDiscover: {(discovered: [AnyHashable: Any]?, error: Error?) -> Void in
+                    DispatchQueue.main.async {
+                        if error != nil {
+                            print("onDiscover error \(error!.localizedDescription)")
+                            self.sendError(command: command, result: error!.localizedDescription)
+                        } else if (discovered != nil){
+                            print("onDiscover success")
+                            self.sendThroughChannel(jsonDictionary: discovered!)
+                        }
+                    }
+                })
+            }
+            return
+        default:
+            self.sendError(command: command, result: "Unsupported tech \(tech)")
+        }
+    }
+    
+    @objc(endSession:)
+    func endSession(command: CDVInvokedUrlCommand) {
+        guard #available(iOS 11.0, *) else {
+            sendError(command: command, result: "close is only available on iOS 13+")
+            return
+        }
+        DispatchQueue.main.async {
+            guard let session = self.ndefController?.session else {
+                self.sendError(command: command, result: "no session to terminate")
+                return
+            }
+
+            session.invalidate()
+            self.nfcController = nil
+            self.sendSuccess(command: command, result: "Session Ended!")
         }
     }
 }

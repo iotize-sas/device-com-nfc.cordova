@@ -580,7 +580,20 @@ var nfc = {
         return new Promise(function(resolve, reject) {
             cordova.exec(resolve, reject, 'NfcPlugin', 'setTapDeviceDiscoveryEnabled', [!!enabled]);
         });
-   }
+    },
+   
+    beginSessionFromTech: function(tech) {
+        return new Promise(function(resolve, reject) {
+            cordova.exec(resolve, reject, 'NfcPlugin', 'beginSessionFromTech', [tech]);
+        });
+    },
+
+    endSession: function() {
+        return new Promise(function(resolve, reject) {
+            cordova.exec(resolve,reject, 'NfcPlugin', 'endSession', []);
+        })    
+    }
+    
 
 };
 

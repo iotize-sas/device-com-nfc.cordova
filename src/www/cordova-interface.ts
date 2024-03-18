@@ -31,4 +31,12 @@ export interface CordovaInterface {
   transceive(data: ArrayBuffer | string): Promise<string>;
 
   setTapDeviceDiscoveryEnabled(value: boolean): Promise<void>;
+  
+  /**
+   * Begins a reading session for the given technology.
+   * @param tech String representing the technology of the tap to discover.
+   */
+  beginSessionFromTech(tech: string): Promise<void>;
+
+  endSession(): Promise<void>;
 }

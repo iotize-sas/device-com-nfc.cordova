@@ -9,76 +9,78 @@
 import UIKit
 import CoreNFC
 
-
-public extension String {
-    
-     func dataFromHexString() -> Data {
-        var bytes = [UInt8]()
-        for i in 0..<(count/2) {
-            let range = index(self.startIndex, offsetBy: 2*i)..<index(self.startIndex, offsetBy: 2*i+2)
-            let stringBytes = self[range]
-            let byte = strtol((stringBytes as NSString).utf8String, nil, 16)
-            bytes.append(UInt8(byte))
-        }
-        return Data(bytes: UnsafePointer<UInt8>(bytes), count:bytes.count)
-    }
-    
-}
-
-extension Data {
-    
-    func hexEncodedString() -> String {
-        let format = "%02hhX"
-        return map { String(format: format, $0) }.joined()
-    }
-}
-
 @available(iOS 13.0, *)
-class ST25DVReader : NSObject {
-   
-    typealias Completion = (Error?) -> ()
+class ST25DVReader : NFCTagReader {
     
-    private var comSession: NFCTagReaderSession?
-    private var tag: NFCISO15693Tag?
-
-    static var   MB_CTRL_DYN : UInt8 = 0x0D
+    var iso15Tag: NFCISO15693Tag?
+    var detectionRetryCount = 0
     
-    private var connectionCompleted :  Completion?
-    
-    /*ST25 commands*/
-    static var   ISO15693_CUSTOM_ST25DV_CMD_WRITE_MB_MSG : UInt8 =  0xAA;
-    static var   ISO15693_CUSTOM_ST25DV_CMD_READ_MB_MSG_LENGTH : Int =  0xAB;
-    static var   ISO15693_CUSTOM_ST25DV_CMD_READ_MB_MSG = 0xAC;
-    
-    static var   ISO15693_CUSTOM_ST_CMD_READ_DYN_CONFIG : Int =  0xAD;
-    static var   ISO15693_CUSTOM_ST_CMD_WRITE_DYN_CONFIG : Int = 0xAE;
-
-    static var   DELAY : UInt32 = 1000;   // timeout resolution in millionths of second
-    static var   NB_MAX_RETRY : Int = 50;
-    
-    override init() {
-        super.init()
+    override func invalidateSession( message :String) {
+        super.invalidateSession(message: message)
+        iso15Tag = nil
     }
+    
+    override func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
 
-    func initSession( alertMessage: String, completed: @escaping (Error?)->() ) {
-        
-        guard NFCNDEFReaderSession.readingAvailable else {
-            completed( NFCReaderError( NFCReaderError.readerErrorUnsupportedFeature ))
+        print( "tagReaderSession:didDectectTag" )
+        guard let session = self.comSession else {
+            return;
+        }
+        if tags.count > 1 {
+            // Restart polling in 500 milliseconds.
+            let retryInterval = DispatchTimeInterval.milliseconds(500)
+            session.alertMessage = "More than 1 Tap is detected. Please remove all tags and try again."
+            DispatchQueue.global().asyncAfter(deadline: .now() + retryInterval, execute: {
+                session.restartPolling()
+            })
             return
         }
         
-        connectionCompleted = completed
-        
-        if NFCNDEFReaderSession.readingAvailable {
-            comSession = NFCTagReaderSession(pollingOption: [.iso15693], delegate: self, queue: nil)
-            comSession?.alertMessage = alertMessage
-            comSession?.begin()
+        guard let tag = tags.first else {
+            return;
         }
-    }
-
-    func invalidateSession( message :String) {
-        comSession?.alertMessage = message
-        comSession?.invalidate()
+        
+        switch tag {
+        case .iso15693(let iso15tag):
+            self.iso15Tag = iso15tag
+            detectionRetryCount = 0
+            
+            // Connect to tag
+            
+            session.connect(to: tag) { [weak self] (error: Error?) in
+                guard let strongSelf = self  else {
+                    return;
+                }
+                
+                if error != nil {
+                    let error = NFCReaderError( NFCReaderError.readerTransceiveErrorTagNotConnected )
+                    strongSelf.invalidateSession( message: error.localizedDescription  )
+                    strongSelf.connectionCompleted?(error)
+                    return
+                }
+                print( "connected to tag" )
+                strongSelf.tag = tag
+                strongSelf.connectionCompleted?(nil)
+                iso15tag.readNDEF(completionHandler: {(ndef: NFCNDEFMessage?, error: Error?) in
+                    if (error != nil) {
+                        strongSelf.onDiscoverCompletion?(iso15tag.toJSON(), nil)
+                    }
+                })
+                strongSelf.onDiscoverCompletion?(iso15tag.toJSON(), nil)
+            }
+            return
+        default:
+            detectionRetryCount += 1
+            if (detectionRetryCount < 5) {
+                usleep(ST25DVReader.DELAY)
+                session.restartPolling()
+                return
+            }
+            let error = NFCReaderError( NFCReaderError.ndefReaderSessionErrorTagNotWritable )
+           invalidateSession( message: error.localizedDescription  )
+           connectionCompleted?(error)
+           return
+        }
     }
     
     func send( request: String, completed: @escaping (Data?,Error?)->() ) {
@@ -117,70 +119,6 @@ class ST25DVReader : NSObject {
 }
 
 @available(iOS 13.0, *)
-extension ST25DVReader : NFCTagReaderSessionDelegate {
-    // MARK: - NFCTagReaderSessionDelegate
-    func tagReaderSessionDidBecomeActive(_ session: NFCTagReaderSession) {
-        // If necessary, you may perform additional operations on session start.
-        // At this point RF polling is enabled.
-        print( "tagReaderSessionDidBecomeActive" )
-    }
- 
-    func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: Error) {
-       // If necessary, you may handle the error. Note session is no longer valid.
-        // You must create a new session to restart RF polling.
-        print( "tagReaderSession:didInvalidateWithError - \(error)" )
-        connectionCompleted?(error)
-        self.comSession = nil
-    }
-
-    func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
-        print( "tagReaderSession:didDectectTag" )
-        guard let session = self.comSession else {
-            return;
-        }
-        if tags.count > 1 {
-            // Restart polling in 500 milliseconds.
-            let retryInterval = DispatchTimeInterval.milliseconds(500)
-            session.alertMessage = "More than 1 Tap is detected. Please remove all tags and try again."
-            DispatchQueue.global().asyncAfter(deadline: .now() + retryInterval, execute: {
-                session.restartPolling()
-            })
-            return
-        }
-        
-        guard let tag = tags.first else {
-            return;
-        }
-            
-        switch tag {
-        case .iso15693(let iso15tag):
-            self.tag = iso15tag
-        default:
-            let error = NFCReaderError( NFCReaderError.ndefReaderSessionErrorTagNotWritable )
-           invalidateSession( message: error.localizedDescription  )
-           connectionCompleted?(error)
-           return;
-        }
-     
-        // Connect to tag
-        session.connect(to: tag) { [weak self] (error: Error?) in
-            guard let strongSelf = self  else {
-                return;
-            }
-            
-            if error != nil {
-                let error = NFCReaderError( NFCReaderError.readerTransceiveErrorTagNotConnected )
-                strongSelf.invalidateSession( message: error.localizedDescription  )
-                strongSelf.connectionCompleted?(error)
-                return
-            }
-            print( "connected to tag" )
-            strongSelf.connectionCompleted?(nil)
-        }
-    }
-}
-
-@available(iOS 13.0, *)
 extension ST25DVReader {
     
     
@@ -210,7 +148,7 @@ extension ST25DVReader {
     }
 
     func sendRequest(request: Data, nbTry: Int, completed: @escaping (Data?, Error?)->() ) {
-        guard let tag = self.tag else {
+        guard let tag = self.iso15Tag else {
             let error = NFCReaderError( NFCReaderError.readerTransceiveErrorTagNotConnected )
             invalidateSession( message: error.localizedDescription  )
             completed(nil, error )
@@ -227,6 +165,7 @@ extension ST25DVReader {
         var parameters  = Data( bytes:[request.count - 1], count: 1 )
         parameters.append(request)
         print( "Send - \(parameters.hexEncodedString())" )
+
         tag.customCommand(requestFlags: [.highDataRate],
                           customCommandCode: 0xAA,
             customRequestParameters:  parameters,
@@ -244,7 +183,7 @@ extension ST25DVReader {
     
     func readResponse( nbTry: Int, completed: @escaping (Data?, Error?)->() ) {
         
-        guard let tag = self.tag else {
+        guard let tag = self.iso15Tag else {
             let error = NFCReaderError( NFCReaderError.readerTransceiveErrorTagNotConnected )
             invalidateSession( message: error.localizedDescription  )
             completed( nil, error )
@@ -304,7 +243,7 @@ extension ST25DVReader {
     }
     
     func checkMBEnabled(completed: @escaping (Error?)->()) {
-        guard let tag = self.tag else {
+        guard let tag = self.iso15Tag else {
             let error = NFCReaderError( NFCReaderError.readerTransceiveErrorTagNotConnected )
              invalidateSession( message: error.localizedDescription  )
              completed( error )
@@ -376,15 +315,27 @@ extension ST25DVReader {
     //full transparent mode
     
     @available(iOS 14.0, *)
-    func transceiveRaw(request: Data, completed: @escaping (Data?, Error?) -> ()) {
-        guard (request.count < 2) else {
+    func transceiveRaw(request: Data, completed: @escaping (Data?, Error?) -> (), nbTry: Int = NB_MAX_RETRY) {
+        guard (request.count >= 2) else {
             completed(nil, NFCReaderError(NFCReaderError.readerErrorInvalidParameterLength))
             return
         }
-        var flags = Int(request[0])
-        var commandCode = Int(request[1])
-        var dataToSend = request.dropFirst(2)
-        self.tag?.sendRequest(requestFlags: flags, commandCode: commandCode, data: dataToSend, resultHandler: {(result: Result<(NFCISO15693ResponseFlag, Data?), any Error>) in
+        let flags = Int(request[0])
+        let commandCode = Int(request[1])
+        let dataToSend = request.dropFirst(2)
+        
+        print("TRANSCEIVE RAW SEND \(request.hexEncodedString())")
+        
+        guard let tag = self.iso15Tag else {
+            completed(nil, NFCReaderError(NFCReaderError.readerTransceiveErrorTagConnectionLost))
+            return
+        }
+        
+        print("TRANSCEIVE RAW SEND ON ISO15TAG TRY \(nbTry), SESSION READY \(String(describing: comSession?.isReady))")
+        
+        tag.sendRequest(requestFlags: flags, commandCode: commandCode, data: dataToSend, resultHandler: {(result: Result<(NFCISO15693ResponseFlag, Data?), any Error>) in
+
+            print("SEND_REQUEST_CALLBACK")
             switch result {
             case .success((let flag, let data)):
                 let firstByteBuffer = withUnsafeBytes(of: flag.rawValue) { Data($0)}
@@ -392,9 +343,15 @@ extension ST25DVReader {
                 if let nonNilData = data {
                     resultData.append(nonNilData)
                 }
+                print("TRANSCEIVE RAW RETURN \(resultData.hexEncodedString())")
                 completed(resultData, nil)
                 return
             case .failure(let error):
+                print("TRANSCEIVE RAW ERROR \(error.localizedDescription), TRY \(nbTry)")
+                if (nbTry >= 0) {
+                    usleep(ST25DVReader.DELAY)
+                    return self.transceiveRaw(request: request, completed: completed, nbTry: nbTry - 1)
+                }
                 completed(nil, error)
                 return
             }
@@ -402,3 +359,19 @@ extension ST25DVReader {
     }
 }
     
+extension NFCISO15693Tag {
+    
+    func toJSON(ndefMessage: NFCNDEFMessage? = nil) -> [AnyHashable: Any] {
+        
+        let wrapper = NSMutableDictionary()
+        wrapper.setValue([UInt8](self.identifier) , forKey: "id")
+        
+        let returnedJSON = NSMutableDictionary()
+        returnedJSON.setValue("tag", forKey: "type")
+        returnedJSON.setObject(wrapper, forKey: "tag" as NSString)
+        
+        
+
+        return returnedJSON as! [AnyHashable : Any]
+    }
+}
