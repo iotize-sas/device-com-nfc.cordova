@@ -1,3 +1,14 @@
+## 3.4.1 (2024-03-19)
+
+
+### Features
+
+* added `setTapDeviceDiscoveryEnabled` and improved `transceive` to connect to NFC tag automatically if not connected 8d28dcd
+* added transceive raw data on android cf30f43
+* added transceive raw data on iOS 
+
+
+
 # 3.3.0 (2023-11-21)
 
 ### Features

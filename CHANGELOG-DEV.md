@@ -1,3 +1,13 @@
+## [3.4.1](https://github.com/iotize-sas/device-com-nfc.cordova/compare/v3.2.3...v3.4.1) (2024-03-19)
+
+
+### Features
+
+* added `setTapDeviceDiscoveryEnabled` and improved `transceive` to connect to NFC tag automatically if not connected 8d28dcd
+* added transceive raw data on android cf30f43
+
+
+
 # [3.3.0](https://github.com/iotize-sas/device-com-nfc.cordova/compare/v3.2.3...v3.3.0) (2023-11-21)
 
 
