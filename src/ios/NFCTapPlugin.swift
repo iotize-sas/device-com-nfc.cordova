@@ -358,12 +358,12 @@ import CoreNFC
     
     @objc(endSession:)
     func endSession(command: CDVInvokedUrlCommand) {
-        guard #available(iOS 11.0, *) else {
-            sendError(command: command, result: "close is only available on iOS 13+")
+        guard #available(iOS 13.0, *) else {
+            sendError(command: command, result: "endSession is only available on iOS 13+")
             return
         }
         DispatchQueue.main.async {
-            guard let session = self.ndefController?.session else {
+            guard let session = (self.nfcController as? NFCTagReader)?.comSession else {
                 self.sendError(command: command, result: "no session to terminate")
                 return
             }
