@@ -62,11 +62,12 @@ class ST25DVReader : NFCTagReader {
                 strongSelf.tag = tag
                 strongSelf.connectionCompleted?(nil)
                 iso15tag.readNDEF(completionHandler: {(ndef: NFCNDEFMessage?, error: Error?) in
-                    if (error != nil) {
-                        strongSelf.onDiscoverCompletion?(iso15tag.toJSON(), nil)
+                    if let readNdef = ndef {
+                        strongSelf.onDiscoverCompletion?(iso15tag.toJSON(ndefMessage: readNdef), nil)
+                    } else {
+                        strongSelf.onDiscoverCompletion?(iso15tag.toJSON(ndefMessage: nil), nil)
                     }
                 })
-                strongSelf.onDiscoverCompletion?(iso15tag.toJSON(), nil)
             }
             return
         default:
@@ -356,22 +357,5 @@ extension ST25DVReader {
                 return
             }
         })
-    }
-}
-    
-extension NFCISO15693Tag {
-    
-    func toJSON(ndefMessage: NFCNDEFMessage? = nil) -> [AnyHashable: Any] {
-        
-        let wrapper = NSMutableDictionary()
-        wrapper.setValue([UInt8](self.identifier) , forKey: "id")
-        
-        let returnedJSON = NSMutableDictionary()
-        returnedJSON.setValue("tag", forKey: "type")
-        returnedJSON.setObject(wrapper, forKey: "tag" as NSString)
-        
-        
-
-        return returnedJSON as! [AnyHashable : Any]
     }
 }

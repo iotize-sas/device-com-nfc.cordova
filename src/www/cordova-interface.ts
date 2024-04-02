@@ -36,7 +36,7 @@ export interface CordovaInterface {
    * Begins a reading session for the given technology.
    * @param tech String representing the technology of the tap to discover.
    */
-  beginSessionFromTech(tech: string): Promise<void>;
+  beginSessionFromTech(tech: string, alertMessage?: string): Promise<void>;
 
   endSession(): Promise<void>;
 }
