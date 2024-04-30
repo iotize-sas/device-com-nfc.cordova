@@ -582,9 +582,13 @@ var nfc = {
         });
     },
    
-    beginSessionFromTech: function(tech) {
+    beginSessionFromTech: function(tech, alertMessage = undefined) {
+        const args = [tech];
+        if (alertMessage) {
+            args.push(alertMessage);
+        }
         return new Promise(function(resolve, reject) {
-            cordova.exec(resolve, reject, 'NfcPlugin', 'beginSessionFromTech', [tech]);
+            cordova.exec(resolve, reject, 'NfcPlugin', 'beginSessionFromTech', args);
         });
     },
 
