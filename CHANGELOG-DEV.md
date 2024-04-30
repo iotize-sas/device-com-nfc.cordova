@@ -1,3 +1,11 @@
+# [3.5.0](https://github.com/iotize-sas/device-com-nfc.cordova/compare/v3.2.3...v3.5.0) (2024-04-30)
+
+
+### Features
+
+* added `parseTapNdefMessage()` and `parseTapNdefMessages()` and trigger tag discover systematically and added ndefMessage info if available 9556164
+
+
 ## [3.4.1](https://github.com/iotize-sas/device-com-nfc.cordova/compare/v3.2.3...v3.4.1) (2024-03-19)
 
 
