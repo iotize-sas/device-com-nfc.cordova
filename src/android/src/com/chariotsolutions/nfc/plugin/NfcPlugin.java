@@ -833,45 +833,61 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
 
     private void parseMessage() {
         cordova.getThreadPool().execute(() -> {
-            Log.d(TAG, "parseMessage " + getIntent());
-            Intent intent = getIntent();
-            String action = intent.getAction();
-            Log.d(TAG, "action " + action);
-            if (action == null) {
-                return;
-            }
+            try {
+                Log.d(TAG, "parseMessage " + getIntent());
+                Intent intent = getIntent();
+                String action = intent.getAction();
+                Log.d(TAG, "action " + action);
+                if (action == null) {
+                    return;
+                }
 
-            Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
-            Parcelable[] messages = intent.getParcelableArrayExtra((NfcAdapter.EXTRA_NDEF_MESSAGES));
+                final Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+                if (tag != null) {
+                    Parcelable[] messages = intent.getParcelableArrayExtra((NfcAdapter.EXTRA_NDEF_MESSAGES));
 
-            if (isTapDeviceDiscoveryEnabled() && isIoTizeTag(tag)) {
-                onTapDeviceDiscoveredIntent(intent);
-            }
 
-            if (action.equals(NfcAdapter.ACTION_NDEF_DISCOVERED)) {
-                Ndef ndef = Ndef.get(tag);
-                fireNdefEvent(NDEF_MIME, ndef, messages);
-                Log.d(TAG, "Saving Intent for connect" + intent);
-                savedIntent = intent;
+                    if (isTapDeviceDiscoveryEnabled() && isIoTizeTag(tag)) {
+                        onTapDeviceDiscoveredIntent(intent);
+                    }
 
-            } else if (action.equals(NfcAdapter.ACTION_TECH_DISCOVERED)) {
-                for (String tagTech : tag.getTechList()) {
-                    Log.d(TAG, tagTech);
-                    if (tagTech.equals(NdefFormatable.class.getName())) {
-                        fireNdefFormatableEvent(tag);
-                    } else if (tagTech.equals(Ndef.class.getName())) { //
+                    if (action.equals(NfcAdapter.ACTION_NDEF_DISCOVERED)) {
                         Ndef ndef = Ndef.get(tag);
-                        fireNdefEvent(NDEF, ndef, messages);
+                        fireNdefEvent(NDEF_MIME, ndef, messages);
+                        Log.d(TAG, "Saving Intent for connect" + intent);
+                        savedIntent = intent;
+                        fireTagEvent(tag, messages);
+
+                    } else if (action.equals(NfcAdapter.ACTION_TECH_DISCOVERED)) {
+                        this._fireTagEventsFromTechList(tag, messages);
+                        fireTagEvent(tag, messages);
+                    } else if (action.equals(NfcAdapter.ACTION_TAG_DISCOVERED)) {
+                        fireTagEvent(tag, messages);
                     }
                 }
             }
-
-            if (action.equals(NfcAdapter.ACTION_TAG_DISCOVERED)) {
-                fireTagEvent(tag);
+            catch (RuntimeException err) {
+                Log.w(TAG, "Unhandled error with parseMessage()", err);
             }
 
             setIntent(new Intent());
         });
+    }
+
+    private void _fireTagEventsFromTechList(@NonNull Tag tag, @NonNull Parcelable[] messages) {
+        for (String tagTech : tag.getTechList()) {
+            Log.d(TAG, tagTech);
+            if (tagTech.equals(NdefFormatable.class.getName())) {
+                fireNdefFormatableEvent(tag);
+            } else if (tagTech.equals(Ndef.class.getName())) { //
+                 this._fireNdefEvent(tag, messages);
+            }
+        }
+    }
+
+    private void _fireNdefEvent(@NonNull Tag tag, @NonNull Parcelable[] messages) {
+        Ndef ndef = Ndef.get(tag);
+        fireNdefEvent(NDEF, ndef, messages);
     }
 
     private boolean isIoTizeTag(@Nullable Tag tag) {
@@ -892,7 +908,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
         }
         NdefRecord[] records = ndefMessages.getRecords();
 
-        return records.length > 0;
+        return records.length >= 4; // TODO improve condition
     }
 
     private void sendEvent(String type, JSONObject tag, JSONObject tap) {
@@ -931,7 +947,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
     private void fireNdefEvent(String type, Ndef ndef, Parcelable[] messages) {
         try {
             JSONObject json = buildNdefJSON(ndef, messages);
-            sendEvent(type, json);
+              sendEvent(type, json);
         } catch (Throwable e) {
             Log.w(TAG, "Failed to fire NDef event", e);
         }
@@ -993,8 +1009,13 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
         sendEvent(NDEF_FORMATABLE, Util.tagToJSON(tag));
     }
 
-    private void fireTagEvent(Tag tag) {
-        sendEvent(TAG_DEFAULT, Util.tagToJSON(tag));
+    private void fireTagEvent(Tag tag, Parcelable[] messages) {
+        if (Arrays.asList(tag.getTechList()).contains(Ndef.class.getName())) {
+            sendEvent(TAG_DEFAULT, buildNdefJSON(Ndef.get(tag), messages));
+        }
+        else {
+            sendEvent(TAG_DEFAULT, Util.tagToJSON(tag));
+        }
     }
 
     /**
