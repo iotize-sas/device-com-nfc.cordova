@@ -98,6 +98,9 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
     @Nullable
     private TagTechnology tagTechnology = null;
 
+    @NonNull
+    private String _lastTechName = "android.nfc.tech.NfcV";
+
     @Nullable
     private Class<?> tagTechnologyClass;
 
@@ -1133,6 +1136,7 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
                          final CallbackContext callbackContext) {
         this.cordova.getThreadPool().execute(() -> {
             try {
+                this._lastTechName = tech;
                 this._initIntentTag(tech);
 
                 if (nfcProtocol == null) {        
@@ -1152,10 +1156,6 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
                 callbackContext.error(e.getMessage());
             }
         });
-    }
-
-    private void _initIntentTag() throws Exception {
-        this._initIntentTag("android.nfc.tech.NfcV"); // TODO
     }
 
     private void _initIntentTag(final String tech) throws Exception {
@@ -1267,13 +1267,13 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
     }
 
     private void _connectIntentTag() throws Exception {
-        this._initIntentTag();
+        this._initIntentTag(this._lastTechName);
         tagTechnology.connect();
     }
 
     private void _connectIntentTagIfNeeded() throws Exception {
         if (tagTechnology == null) {
-            this._initIntentTag();
+            this._initIntentTag(this._lastTechName);
             tagTechnology.connect();
         }
     }
