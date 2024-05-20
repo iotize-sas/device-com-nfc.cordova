@@ -512,6 +512,13 @@ var nfc = {
         });
     },
 
+
+    connectRaw: function(tech, timeout) {
+        return new Promise(function(resolve, reject) {
+            cordova.exec(resolve, reject, 'NfcPlugin', 'connectRaw', [tech, timeout]);
+        });
+    },
+
     close: function() {
         return new Promise(function(resolve, reject) {
             cordova.exec(resolve, reject, 'NfcPlugin', 'close', []);

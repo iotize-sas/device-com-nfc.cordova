@@ -14,9 +14,14 @@ export interface CordovaInterface {
   close(): Promise<void>;
 
   /**
-   * Connect to current nfc tag
+   * Connect to current Tap nfc tag
    */
   connect(tech: string, timeout?: number): Promise<void>;
+
+  /**
+   * Raw NFC connect
+   */
+  connectRaw(tech: string, timeout?: number): Promise<void>;
 
   /**
    * Transeive data using Tap NFC communication protocol
@@ -31,7 +36,7 @@ export interface CordovaInterface {
   transceive(data: ArrayBuffer | string): Promise<string>;
 
   setTapDeviceDiscoveryEnabled(value: boolean): Promise<void>;
-  
+
   /**
    * Begins a reading session for the given technology.
    * @param tech String representing the technology of the tap to discover.
