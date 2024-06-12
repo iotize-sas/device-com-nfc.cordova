@@ -10,7 +10,7 @@ extension AppDelegate {
     
     override open func application(_ application: UIApplication,
                      continue userActivity: NSUserActivity,
-                     restorationHandler: @escaping ([Any]?) -> Void) -> Bool {
+                     restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
         
         NSLog("Extending UIApplicationDelegate")
         
