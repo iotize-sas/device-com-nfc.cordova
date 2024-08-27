@@ -18,6 +18,16 @@ import { debug } from './logger';
 
 declare var nfc: CordovaInterface;
 
+class PromiseQueue {
+  queue = Promise.resolve<any>(true);
+
+  add<T>(operation: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      this.queue = this.queue.then(operation).then(resolve).catch(reject);
+    });
+  }
+}
+
 export class NFCComProtocol extends QueueComProtocol {
   constructor(
     options: ComProtocolOptions = {
@@ -54,6 +64,8 @@ export class NFCComProtocol extends QueueComProtocol {
       },
     });
   }
+
+  private _sendQueue = new PromiseQueue();
 
   /**
    * We force tag connection with nfc as we need to refresh tag
@@ -92,7 +104,10 @@ export class NFCComProtocol extends QueueComProtocol {
   }
 
   _disconnect(options?: ComProtocolDisconnectOptions): Observable<any> {
-    return defer(() => nfc.close());
+    return defer(async () => {
+      await nfc.close();
+      this._sendQueue = new PromiseQueue();
+    });
   }
 
   /**
@@ -118,29 +133,31 @@ export class NFCComProtocol extends QueueComProtocol {
     options?: ComProtocolSendOptions
   ): Observable<Uint8Array> {
     return defer(async () => {
-      try {
-        const response = await nfc.transceiveTap(bufferToHexString(data));
-        if (typeof response != 'string') {
-          throw NfcError.internalError(
-            `Internal error. Plugin should respond a hexadecimal string`
-          );
-        }
-        debug('NFC plugin response: ', response);
-        return hexStringToBuffer(response);
-      } catch (errString) {
-        if (typeof errString === 'string') {
-          const error = stringToError(errString);
-          if (
-            error.code === NfcError.ErrorCode.NotConnectedError ||
-            error.code === NfcError.ErrorCode.TagLostError
-          ) {
-            this._onConnectionLost(error);
+      return await this._sendQueue.add(async () => {
+        try {
+          const response = await nfc.transceiveTap(bufferToHexString(data));
+          if (typeof response != 'string') {
+            throw NfcError.internalError(
+              `Internal error. Plugin should respond a hexadecimal string`
+            );
           }
-          throw error;
-        } else {
-          throw errString;
+          debug('NFC plugin response: ', response);
+          return hexStringToBuffer(response);
+        } catch (errString) {
+          if (typeof errString === 'string') {
+            const error = stringToError(errString);
+            if (
+              error.code === NfcError.ErrorCode.NotConnectedError ||
+              error.code === NfcError.ErrorCode.TagLostError
+            ) {
+              this._onConnectionLost(error);
+            }
+            throw error;
+          } else {
+            throw errString;
+          }
         }
-      }
+      });
     });
   }
 
