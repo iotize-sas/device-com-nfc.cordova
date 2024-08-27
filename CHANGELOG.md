@@ -1,4 +1,13 @@
-# [3.5.0](https://github.com/iotize-sas/device-com-nfc.cordova/compare/v3.2.3...v3.5.0) (2024-04-30)
+## 3.6.1 (2024-08-27)
+
+
+### Features
+
+* added message queue for `NfcComProtocol.send()` aa91bab
+
+
+
+# 3.5.0 (2024-04-30)
 
 
 ### Features

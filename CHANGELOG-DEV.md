@@ -1,3 +1,14 @@
+## [3.6.1](https://github.com/iotize-sas/device-com-nfc.cordova/compare/v3.5.0...v3.6.1) (2024-08-27)
+
+
+### Features
+
+* added configurable last tech name 165d9c1
+* added message queue for send aa91bab
+* added raw NFC connect ec6e911
+
+
+
 # [3.5.0](https://github.com/iotize-sas/device-com-nfc.cordova/compare/v3.2.3...v3.5.0) (2024-04-30)
 
 
