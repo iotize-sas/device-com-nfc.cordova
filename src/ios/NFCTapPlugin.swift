@@ -17,6 +17,20 @@ import CoreNFC
     var lastError: Error?
     var channelCommand: CDVInvokedUrlCommand?
     var isListeningNDEF = false
+    
+    private var _isTapDiscoveryEnabled: Bool!
+    
+    override func pluginInitialize(){
+        //Need to be initialized here, otherwise it is not set to true
+        self._isTapDiscoveryEnabled = true
+    }
+    
+    func sendSuccess(command: CDVInvokedUrlCommand) {
+        let pluginResult = CDVPluginResult(
+            status: CDVCommandStatus_OK
+        )
+        commandDelegate!.send(pluginResult, callbackId: command.callbackId)
+    }
 
     // helper to return a string
     func sendSuccess(command: CDVInvokedUrlCommand, result: String) {
@@ -55,30 +69,47 @@ import CoreNFC
         commandDelegate!.send(pluginResult, callbackId: command.callbackId)
     }
 
+    //IoTize Tap specific connect. Opens reading session and connect to tap on discover
     @objc(connect:)
     func connect(command: CDVInvokedUrlCommand) {
-        print("CONNECT NFC")
+        printNFC("connect")
         guard #available(iOS 13.0, *) else {
             sendError(command: command, result: "connect is only available on iOS 13+")
             return
         }
+
+        var alertMessage = "Bring your phone close to the Tap."
         
-        if let controller = self.nfcController as? ST25DVReader {
-            if let tag = controller.tag {
-                if (tag.isAvailable) {
-                    //already connected, refire info
-                    sendSuccess(command: command, result: "CONNECTED")
+        if let alertMessageFromCommand = command.argument(at:0) as? String {
+            alertMessage = alertMessageFromCommand
+        }
+        
+        
+        DispatchQueue.main.async {
+            printNFC("Begin session \(String(describing: self.nfcController))")
+            if self.nfcController == nil {
+                self.nfcController = NFCTagReader(plugin: self)
+            }
+            
+            if let isSessionReady = (self.nfcController as! NFCTagReader).comSession?.isReady {
+                if isSessionReady {
+                    // We reuse the current session
+                    (self.nfcController as! NFCTagReader).connect(tech: NfcTech.NfcV, connectionCompletion: {
+                        (error: Error?) -> Void in
+
+                        DispatchQueue.main.async {
+                            if error != nil {
+                                self.sendError(command: command, result: error!.localizedDescription)
+                            } else {
+                                self.sendSuccess(command: command, result: "")
+                            }
+                        }
+                    })
                     return
                 }
             }
-        }
-        DispatchQueue.main.async {
-            print("Begin session \(String(describing: self.nfcController))")
-            if self.nfcController == nil {
-                self.nfcController = ST25DVReader()
-            }
 
-            (self.nfcController as! ST25DVReader).initSession(pollingOption: [.iso15693], alertMessage: "Bring your phone close to the Tap.", completed: {
+            (self.nfcController as! NFCTagReader).initSession(pollingOption: [.iso15693], alertMessage: alertMessage, completed: {
                 (error: Error?) -> Void in
 
                 DispatchQueue.main.async {
@@ -94,6 +125,7 @@ import CoreNFC
 
     @objc(close:)
     func close(command: CDVInvokedUrlCommand) {
+        printNFC("close")
         guard #available(iOS 13.0, *) else {
             sendError(command: command, result: "close is only available on iOS 13+")
             return
@@ -104,19 +136,21 @@ import CoreNFC
                 return
             }
 
-            (self.nfcController as! NFCTagReader).invalidateSession(message: "Sesssion Ended!")
+            (self.nfcController as! NFCTagReader).invalidateSession(message: "Session Ended!")
             self.nfcController = nil
         }
     }
 
     @objc(transceiveTap:)
     func transceiveTap(command: CDVInvokedUrlCommand) {
+        printNFC("transceiveTap")
+
         guard #available(iOS 13.0, *) else {
             sendError(command: command, result: "transceive is only available on iOS 13+")
             return
         }
         DispatchQueue.main.async {
-            print("sending ...")
+            printNFC("sending ...")
             if self.nfcController == nil {
                 self.sendError(command: command, result: "no session available")
                 return
@@ -134,9 +168,9 @@ import CoreNFC
             }
             let request = data.map { String(format: "%02x", $0) }
                 .joined()
-            print("send request  - \(request)")
+            printNFC("send request  - \(request)")
 
-            (self.nfcController as! ST25DVReader).send(request: request, completed: {
+            (self.nfcController as! NFCTagReader).sendTap(request: request, completed: {
                 (response: Data?, error: Error?) -> Void in
 
                 DispatchQueue.main.async {
@@ -144,7 +178,7 @@ import CoreNFC
                         self.lastError = error
                         self.sendError(command: command, result: error!.localizedDescription)
                     } else {
-                        print("responded \(response!.hexEncodedString())")
+                        printNFC("responded \(response!.hexEncodedString())")
                         self.sendSuccess(command: command, result: response!.hexEncodedString())
                     }
                 }
@@ -154,28 +188,41 @@ import CoreNFC
     
     @objc(registerTag:)
     func registerTag(command: CDVInvokedUrlCommand) {
-        print("Registered NDEF Listener")
-        //isListeningNDEF = true // Flag for the AppDelegate
-        sendSuccess(command: command, result: "Tag Listener is on")
+        printNFC("registerTag")
+        registerChannel()
+        //No need to register, NFC tag discovery handled in sessions
+        sendSuccess(command: command)
+    }
+    
+    @objc(registerTapDevice:)
+    func registerTapDevice(command: CDVInvokedUrlCommand) {
+        printNFC("registerTapDevice")
+        registerChannel()
+        //No need to register, NFC tag discovery handled in sessions
+        sendSuccess(command: command)
     }
 
     @objc(registerNdef:)
     func registerNdef(command: CDVInvokedUrlCommand) {
-        print("Registered NDEF Listener")
-        isListeningNDEF = true // Flag for the AppDelegate
-        sendSuccess(command: command, result: "NDEF Listener is on")
+        printNFC("registerNdef")
+        registerChannel()
+        sendSuccess(command: command)
     }
 
     @objc(registerMimeType:)
     func registerMimeType(command: CDVInvokedUrlCommand) {
-        print("Registered Mi Listener")
+        printNFC("registerMimeType")
+        registerChannel()
+        //No need to register, NFC tag discovery handled in sessions
         sendSuccess(command: command, result: "NDEF Listener is on")
     }
 
     @objc(beginNDEFSession:)
     func beginNDEFSession(command: CDVInvokedUrlCommand) {
+        printNFC("beginNDEFSession")
+        
         DispatchQueue.main.async {
-            print("Begin NDEF reading session")
+            printNFC("Begin NDEF reading session")
 
             if self.ndefController == nil {
                 var message: String?
@@ -185,7 +232,7 @@ import CoreNFC
                 self.ndefController = NFCNDEFDelegate(completed: {
                     (response: [AnyHashable: Any]?, error: Error?) -> Void in
                     DispatchQueue.main.async {
-                        print("handle NDEF")
+                        printNFC("handle NDEF")
                         if error != nil {
                             self.lastError = error
                             self.sendError(command: command, result: error!.localizedDescription)
@@ -202,6 +249,8 @@ import CoreNFC
 
     @objc(invalidateNDEFSession:)
     func invalidateNDEFSession(command: CDVInvokedUrlCommand) {
+        printNFC("invalidateNDEFSession")
+
         guard #available(iOS 11.0, *) else {
             sendError(command: command, result: "close is only available on iOS 13+")
             return
@@ -220,8 +269,9 @@ import CoreNFC
 
     @objc(channel:)
     func channel(command: CDVInvokedUrlCommand) {
+        printNFC("channel")
         DispatchQueue.main.async {
-            print("Creating NDEF Channel")
+            printNFC("Creating NDEF Channel")
             self.channelCommand = command
             self.sendThroughChannel(message: "Did create NDEF Channel")
         }
@@ -229,11 +279,11 @@ import CoreNFC
 
     func sendThroughChannel(message: String) {
         guard let command: CDVInvokedUrlCommand = self.channelCommand else {
-            print("Channel is not set")
+            printNFC("Channel is not set")
             return
         }
         guard let response = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: message) else {
-            print("sendThroughChannel Did not create CDVPluginResult")
+            printNFC("sendThroughChannel Did not create CDVPluginResult")
             return
         }
 
@@ -243,11 +293,11 @@ import CoreNFC
 
     func sendThroughChannel(jsonDictionary: [AnyHashable: Any]) {
         guard let command: CDVInvokedUrlCommand = self.channelCommand else {
-            print("Channel is not set")
+            printNFC("Channel is not set")
             return
         }
         guard let response = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: jsonDictionary) else {
-            print("sendThroughChannel Did not create CDVPluginResult")
+            printNFC("sendThroughChannel Did not create CDVPluginResult")
             return
         }
 
@@ -259,6 +309,8 @@ import CoreNFC
 
     @objc(enabled:)
     func enabled(command: CDVInvokedUrlCommand) {
+        printNFC("enabled")
+
         guard #available(iOS 11.0, *) else {
             sendError(command: command, result: "enabled is only available on iOS 11+")
             return
@@ -270,13 +322,15 @@ import CoreNFC
     //full transparent mode
     @objc(transceive:)
     func transceive(command: CDVInvokedUrlCommand) {
+        printNFC("transceive")
+
         guard #available(iOS 14.0, *) else {
             sendError(command: command, result: "Tranparent transceive is only available in iOS 14+")
             return
         }
         
         DispatchQueue.main.async {
-            print("sending ...")
+            printNFC("sending ...")
             if self.nfcController == nil {
                 self.sendError(command: command, result: "no session available")
                 return
@@ -293,7 +347,7 @@ import CoreNFC
                 return
             }
 
-            (self.nfcController as! ST25DVReader).transceiveRaw(request: data, completed: {
+            (self.nfcController as! NFCTagReader).transceiveRaw(request: data, completed: {
                 (response: Data?, error: Error?) -> Void in
 
                 DispatchQueue.main.async {
@@ -301,7 +355,7 @@ import CoreNFC
                         self.lastError = error
                         self.sendError(command: command, result: error!.localizedDescription)
                     } else {
-                        print("responded \(response!.hexEncodedString())")
+                        printNFC("responded \(response!.hexEncodedString())")
                         self.sendSuccess(command: command, result: response!.hexEncodedString())
                     }
                 }
@@ -311,69 +365,89 @@ import CoreNFC
     
     @objc(beginSessionFromTech:)
     func beginSessionFromTech(command: CDVInvokedUrlCommand) {
-        
+        printNFC("beginSessionFromTech")
+
 //        self.nfcController = nil // Clear previous session, if any
         
         guard #available(iOS 13.0, *) else {
-            sendError(command: command, result: "NFC Tag Session is only available in iOS 13+")
+            sendError(command: command, result: "connectRaw is only available on iOS 13+")
             return
         }
-        // we need data to send
-        if command.arguments.count <= 0 {
-            self.sendError(command: command, result: "beginSessionFromTech parameter error: missing tech")
+        var tech = ""
+        
+        if let techFromCommand = command.argument(at: 0) as? String {
+            tech = techFromCommand
+        }
+        
+        var pollingOption: NFCTagReaderSession.PollingOption = []
+        
+        if let techAsNfcTech = NfcTech(rawValue: tech) {
+            switch (techAsNfcTech) {
+            case .NfcV:
+                pollingOption.insert(.iso15693)
+                break
+            case .IsoDep:
+                fallthrough
+            case .NfcA:
+                fallthrough
+            case .NfcB:
+                pollingOption.insert(.iso14443)
+                break
+            case .AnyTag:
+                pollingOption.insert(.iso14443)
+                pollingOption.insert(.iso15693)
+                break
+            default:
+                self.sendError(command: command, result: "Tech \(tech) not available")
+                break
+            }
+        } else {
+            self.sendError(command: command, result: "Invalid parameter \(tech)")
             return
         }
-
-        guard let tech = command.argument(at: 0) as? String else {
-            self.sendError(command: command, result: "beginSessionFromTech parameter error: improper tech")
-            return
-        }
+        
         var alertMessage = "Begin NFC Session"
         
         if let alertMessageFromCommand = command.argument(at:1) as? String {
             alertMessage = alertMessageFromCommand
         }
         
-        switch tech {
-        case "nfcV":
-            DispatchQueue.main.async {
-                print("Begin session \(String(describing: self.nfcController))")
-                if self.nfcController == nil {
-                    self.nfcController = ST25DVReader()
-                }
-
-                (self.nfcController as! ST25DVReader).initSession(pollingOption: [.iso15693], alertMessage: alertMessage, completed: {
-                    (error: Error?) -> Void in
-
-                    DispatchQueue.main.async {
-                        if error != nil {
-                            print("onBeginSessionFromTech error \(error!.localizedDescription)")
-                            self.sendError(command: command, result: error!.localizedDescription)
-                        } else {
-                            print("onBeginSessionFromTech sucess")
-                            self.sendSuccess(command: command, result: "nfcV session started")
-                        }
-                    }
-                }, onDiscover: {(discovered: [AnyHashable: Any]?, error: Error?) -> Void in
-                    DispatchQueue.main.async {
-                        if error != nil {
-                            print("onDiscover error \(error!.localizedDescription)")
-                            self.sendError(command: command, result: error!.localizedDescription)
-                        } else if (discovered != nil){
-                            print("onDiscover success")
-                            self.sendThroughChannel(jsonDictionary: discovered!)
-                        }
-                    }
-                })
+        DispatchQueue.main.async {
+            printNFC("Begin session NFC \(String(describing: pollingOption))")
+            if self.nfcController == nil {
+                self.nfcController = NFCTagReader(plugin: self)
             }
-            return
-        default:
-            self.sendError(command: command, result: "Unsupported tech \(tech)")
+
+            (self.nfcController as! NFCTagReader).initSession(pollingOption: pollingOption, alertMessage: alertMessage, initSessionCompletion: {
+                (error: Error?) -> Void in
+
+                DispatchQueue.main.async {
+                    if error != nil {
+                        printNFC("onBeginSessionFromTech error \(error!.localizedDescription)")
+                        self.sendError(command: command, result: error!.localizedDescription)
+                    } else {
+                        printNFC("onBeginSessionFromTech sucess")
+                        self.sendSuccess(command: command, result: "nfcV session started")
+                    }
+                }
+            }, onDiscover: {(discovered: [AnyHashable: Any]?, error: Error?) -> Void in
+                DispatchQueue.main.async {
+                    if error != nil {
+                        printNFC("onDiscover error \(error!.localizedDescription)")
+                        self.sendError(command: command, result: error!.localizedDescription)
+                    } else if (discovered != nil){
+                        printNFC("onDiscover success")
+                        self.sendThroughChannel(jsonDictionary: discovered!)
+                    }
+                }
+            })
         }
     }
     
     @objc(endSession:)
     func endSession(command: CDVInvokedUrlCommand) {
+        printNFC("endSession")
+
         guard #available(iOS 13.0, *) else {
             sendError(command: command, result: "endSession is only available on iOS 13+")
             return
@@ -390,9 +464,64 @@ import CoreNFC
         }
     }
     
-    @objc(registerTapDevice:)
-    func registerTapDevice(command: CDVInvokedUrlCommand) {
-        let result = CDVPluginResult(status: CDVCommandStatus.ok)
-        commandDelegate.send(result, callbackId: command.callbackId)
+    @objc(connectRaw:)
+    func connectRaw(command: CDVInvokedUrlCommand) {
+        printNFC("connectRaw")
+
+        guard #available(iOS 13.0, *) else {
+            sendError(command: command, result: "connectRaw is only available on iOS 13+")
+            return
+        }
+        
+        guard let tech = command.argument(at: 0) as? String else {
+            self.sendError(command: command, result: "beginSessionFromTech parameter error: improper tech")
+            return
+        }
+        
+        guard let techAsNfcTech = NfcTech(rawValue: tech) else {
+            self.sendError(command: command, result: "Tech \(tech) not available")
+            return
+        }
+        
+//        DispatchQueue.main.async {
+            printNFC("sending ...")
+            if self.nfcController == nil {
+                self.sendError(command: command, result: "no session available")
+                return
+            }
+            
+            (self.nfcController as! NFCTagReader).connect(tech: techAsNfcTech, connectionCompletion: {
+                (error: Error?) -> Void in
+
+                DispatchQueue.main.async {
+                    if error != nil {
+                        self.sendError(command: command, result: error!.localizedDescription)
+                    } else {
+                        self.sendSuccess(command: command, result: "")
+                    }
+                }
+            })
+//        }
+        
+        
     }
+    
+    @objc(setTapDeviceDiscoveryEnabled:)
+    func setTapDeviceDiscoveryEnabled(command: CDVInvokedUrlCommand) {
+        printNFC("setTapDeviceDiscoveryEnabled")
+        if let enabled = command.argument(at: 0) as? Bool {
+            self._isTapDiscoveryEnabled = enabled
+        } else {
+            self._isTapDiscoveryEnabled = false
+        }
+    }
+    
+    func isTapDiscoveryEnabled() -> Bool {
+        return self._isTapDiscoveryEnabled
+    }
+    
+    func registerChannel() {
+        isListeningNDEF = true // Flag for the AppDelegate
+    }
+
 }
