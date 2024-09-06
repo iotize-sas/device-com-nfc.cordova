@@ -148,12 +148,6 @@ public class NfcPlugin extends CordovaPlugin implements NfcAdapter.OnNdefPushCom
             return true; // short circuit
         }
 
-        // allow reader mode to be disabled even if nfc is disabled
-        // if (action.equalsIgnoreCase(DISABLE_READER_MODE)) {
-        //     disableReaderMode(callbackContext);
-        //     return true; // short circuit
-        // }
-
         if (!getNfcStatus().equals(STATUS_NFC_OK)) {
             callbackContext.error(getNfcStatus());
             return true; // short circuit
