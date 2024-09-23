@@ -1,3 +1,11 @@
+# 3.8.0 (2024-09-23)
+
+
+### Features
+
+* added nfc tag discovered event triggered at startup d076427
+
+
 ## 3.6.1 (2024-08-27)
 
 

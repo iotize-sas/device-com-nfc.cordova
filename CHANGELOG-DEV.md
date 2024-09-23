@@ -1,3 +1,12 @@
+# [3.8.0](https://github.com/iotize-sas/device-com-nfc.cordova/compare/v3.6.1...v3.8.0) (2024-09-23)
+
+
+### Features
+
+* added nfc tag discovered event triggered at startup d076427
+
+
+
 ## [3.6.1](https://github.com/iotize-sas/device-com-nfc.cordova/compare/v3.5.0...v3.6.1) (2024-08-27)
 
 
