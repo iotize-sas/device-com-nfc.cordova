@@ -6,12 +6,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.IntentFilter.MalformedMimeTypeException;
-import android.net.Uri;
 import android.nfc.FormatException;
 import android.nfc.NdefMessage;
 import android.nfc.NdefRecord;
 import android.nfc.NfcAdapter;
-import android.nfc.NfcEvent;
 import android.nfc.Tag;
 import android.nfc.TagLostException;
 import android.nfc.tech.Ndef;
@@ -116,6 +114,7 @@ public class NfcPlugin extends CordovaPlugin {
     private PendingIntent pendingIntent = null;
 
     private Intent savedIntent = null;
+    private long savedIntentTime = 0;
 
     private CallbackContext readerModeCallback;
     @Nullable
@@ -340,6 +339,20 @@ public class NfcPlugin extends CordovaPlugin {
         addTagFilter();
         restartNfc();
         callbackContext.success();
+        if (savedIntent != null) {
+            long tagOld = System.currentTimeMillis()-savedIntentTime;
+            if (tagOld < 3000) {
+                if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(savedIntent.getAction())) {
+                    Tag tag = savedIntent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+                    if (tag != null ) {
+                        Log.i(TAG, "registerDefaultTag() fire recently tapped tag (" + tagOld + "ms ago)");
+                        Parcelable[] messages = savedIntent.getParcelableArrayExtra((NfcAdapter.EXTRA_NDEF_MESSAGES));
+                        fireTagEvent(tag, messages);
+                        savedIntentTime = 0;
+                    }
+                }
+            }
+        }
     }
 
     private void removeDefaultTag(CallbackContext callbackContext) {
@@ -665,8 +678,8 @@ public class NfcPlugin extends CordovaPlugin {
                     if (action.equals(NfcAdapter.ACTION_NDEF_DISCOVERED)) {
                         Ndef ndef = Ndef.get(tag);
                         fireNdefEvent(NDEF_MIME, ndef, messages);
-                        Log.d(TAG, "Saving Intent for connect" + intent);
                         savedIntent = intent;
+                        savedIntentTime = System.currentTimeMillis();
                         fireTagEvent(tag, messages);
 
                     } else if (action.equals(NfcAdapter.ACTION_TECH_DISCOVERED)) {
