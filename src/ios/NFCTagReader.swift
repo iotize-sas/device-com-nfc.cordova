@@ -193,6 +193,12 @@ class NFCTagReader : NSObject, NFCTagReaderSessionDelegate  {
                     return
                 case .failure(let error):
                     printNFC("TRANSCEIVE RAW ERROR \(error.localizedDescription), TRY \(nbTry)")
+                    if (error is NFCReaderError) {
+                        if (!iso7816Tag.isAvailable) {
+                            completed(nil, error)
+                            return
+                        }
+                    }
                     if (nbTry >= 0) {
                         usleep(NFCTagReader.DELAY)
                         return self.transceiveRaw(request: request, completed: completed, nbTry: nbTry - 1)

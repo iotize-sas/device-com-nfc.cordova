@@ -152,7 +152,7 @@ import CoreNFC
         DispatchQueue.main.async {
             printNFC("sending ...")
             if self.nfcController == nil {
-                self.sendError(command: command, result: "no session available")
+                self.sendError(command: command, result: "not connected")
                 return
             }
 
@@ -176,7 +176,7 @@ import CoreNFC
                 DispatchQueue.main.async {
                     if error != nil {
                         self.lastError = error
-                        self.sendError(command: command, result: error!.localizedDescription)
+                        self.sendError(command: command, result: "Tag was lost")
                     } else {
                         printNFC("responded \(response!.hexEncodedString())")
                         self.sendSuccess(command: command, result: response!.hexEncodedString())
