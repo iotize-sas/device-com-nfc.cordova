@@ -1,3 +1,9 @@
+# 3.8.1 (2024-10-07)
+
+### Bug Fixes
+
+* Properly detect NFC Tap disconnection event on iOS 4c94183
+
 # 3.8.0 (2024-09-23)
 
 
