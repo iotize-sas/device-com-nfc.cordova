@@ -218,42 +218,8 @@ function encodeWellKnownType(message: NdefParsedRecord) {
     return [prefixByte, ...(asciiStringToByteBuffer(slicedString))]
   }
 
-  // } else if (arrayEquals(message.type.slice(), WellKnownType.TEXT)) {
-  //   const encodingNumber = message.payload[0];
-  //   let encoding: 'utf16le' | 'utf8' = 'utf8';
-  //   let languageSizeInBytes = 0;
-  //   if (typeof encodingNumber === 'number') {
-  //     // b0: encodage utf8 s’il vaut 0 et utf16 s’il vaut 1.
-  //     // b1: RFU (set to 0)
-  //     // b2-b7: la taille en octets de la langue (n)
-  //     // B8-B8+n-1: language
-  //     // Bn: message
-  //     const b0 = encodingNumber & 0b10000000;
-  //     encoding = b0 ? 'utf16le' : 'utf8';
-  //     languageSizeInBytes = encodingNumber & 0b00111111;
-  //   }
-  //   const text = message.payload.slice(languageSizeInBytes + 1);
-  //   return {
-  //     type: 'text',
-  //     value: Buffer.from(text).toString(encoding),
-  //   };
-  
-  // //   else if (arrayEquals(message.type.slice(), WellKnownType.SMPART_POSTER)) {
-  // //     return {
-  // //       type: 'sp',
-  // //       // TODO implement
-  // //       payload: message.payload,
-  // //     };
-  // //   }
-  // else {
-  //   return {
-  //     type: 'unknown',
-  //     value: {
-  //       type: message.type.slice(),
-  //       payload: message.payload,
-  //     },
-  //   };
-  // }
+  //TODO check how to reencode text messages
+
   else return [...message.value.type, ...message.value.payload];
 }
 
@@ -266,7 +232,7 @@ function encodeMimeType(message: NdefParsedRecord) {
 }
 
 export function encodeNDEFMessages(ndefRecords: NdefParsedRecord[]) {
-  (ndefRecords || []).map(encodeNDEFMessage)
+  return (ndefRecords || []).map(encodeNDEFMessage)
 }
 
 export function encodeNDEFMessage(ndefRecord: NdefParsedRecord): NdefRecord {
