@@ -125,9 +125,12 @@ function parseWellKnownType(message: Pick<NdefRecord, 'payload' | 'type'>) {
       languageSizeInBytes = encodingNumber & 0b00111111;
     }
     const text = message.payload.slice(languageSizeInBytes + 1);
+    const language = message.payload.slice(8, languageSizeInBytes + 1);
     return {
       type: 'text',
       value: Buffer.from(text).toString(encoding),
+      encoding,
+      language: Buffer.from(language).toString(encoding)
     };
   }
   //   else if (arrayEquals(message.type.slice(), WellKnownType.SMPART_POSTER)) {
@@ -215,11 +218,19 @@ function encodeWellKnownType(message: NdefParsedRecord) {
     }
     const lengthToSlice = WELL_KNOWN_TYPE_URI_PREFIX[prefixByte as keyof typeof WELL_KNOWN_TYPE_URI_PREFIX].length;
     const slicedString = message.value.value.slice(lengthToSlice);
-    return [prefixByte, ...(asciiStringToByteBuffer(slicedString))]
+    return [prefixByte, ...(asciiStringToByteBuffer(slicedString))];
+
+  } else if (message.value.type === 'text') {
+    // b1: RFU (set to 0)
+    // b2-b7: la taille en octets de la langue (n)
+    // B8-B8+n-1: language
+    // Bn: message
+    let firstByte = message.value.encoding == 'utf16le' ? 0b10000000 : 0;
+    firstByte &= (message.value.language & 0b00111111);
+    const languageBytes = Buffer.from(message.value.language, message.value.encoding);
+    const textBytes = Buffer.from(message.value.value, message.value.encoding);
+    return [firstByte, ...languageBytes, ...textBytes];
   }
-
-  //TODO check how to reencode text messages
-
   else return [...message.value.type, ...message.value.payload];
 }
 
