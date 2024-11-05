@@ -66,6 +66,9 @@ class NFCTagReader : NSObject, NFCTagReaderSessionDelegate  {
             initSessionCompletion = nil //do not keep session completion
         }
         printNFC( "tagReaderSessionDidBecomeActive" )
+        if (self.comSession == nil) {
+            self.comSession = session
+        }
     }
  
     func tagReaderSession(_ session: NFCTagReaderSession, didInvalidateWithError error: Error) {
@@ -82,7 +85,7 @@ class NFCTagReader : NSObject, NFCTagReaderSessionDelegate  {
     }
 
     func tagReaderSession(_ session: NFCTagReaderSession, didDetect tags: [NFCTag]) {
-        printNFC( "tagReaderSession:didDectectTag" )
+        printNFC( "tagReaderSession:didDetectTag" )
         guard let session = self.comSession else {
             return;
         }
@@ -103,7 +106,7 @@ class NFCTagReader : NSObject, NFCTagReaderSessionDelegate  {
         
         self.tag = tag
         
-        if let onDiscover = self.onDiscoverCompletion {
+        if self.onDiscoverCompletion != nil {
             
             Task {
                 self.onDiscoverCompletion?(await self.createJSON(tag: tag), nil)
@@ -501,6 +504,33 @@ extension NFCTagReader {
     func createJSON(tag: NFCTag) async -> [AnyHashable: Any] {
         try? await self.comSession?.connect(to: tag)
         return await tag.toJSON(isTapDiscoveryEnabled: self.plugin.isTapDiscoveryEnabled())
+    }
+    
+    func writeNDEF(message: NFCNDEFMessage, completed: @escaping (Error?)->()) {
+        guard let ndefTag = self.tag else {
+            completed(NFCReaderError(NFCReaderError.readerTransceiveErrorTagNotConnected))
+            return
+        }
+        var tag: NFCNDEFTag? = nil
+        switch(ndefTag) {
+        case .iso15693(let iso15693Tag):
+            tag = iso15693Tag
+        default:
+            completed(NFCReaderError(NFCReaderError.readerTransceiveErrorTagNotConnected))
+            return
+            
+        }
+        if (tag != nil) {
+            tag?.writeNDEF(message, completionHandler: {
+                (error:Error?) in
+                if (error != nil) {
+                    completed(error)
+                } else {
+                    completed(nil)
+                }
+            })
+
+        }
     }
 }
     

@@ -176,7 +176,7 @@ import CoreNFC
                 DispatchQueue.main.async {
                     if error != nil {
                         self.lastError = error
-                        self.sendError(command: command, result: "Tag was lost")
+                        self.sendError(command: command, result: "Tag was lost")//error!.localizedDescription)
                     } else {
                         printNFC("responded \(response!.hexEncodedString())")
                         self.sendSuccess(command: command, result: response!.hexEncodedString())
@@ -412,6 +412,8 @@ import CoreNFC
             alertMessage = alertMessageFromCommand
         }
         
+        printNFC("Begin session for tech \(tech) with message: \(alertMessage)")
+        
         DispatchQueue.main.async {
             printNFC("Begin session NFC \(String(describing: pollingOption))")
             if self.nfcController == nil {
@@ -522,6 +524,60 @@ import CoreNFC
     
     func registerChannel() {
         isListeningNDEF = true // Flag for the AppDelegate
+    }
+    
+    @objc(writeTag:)
+    func writeTag(command: CDVInvokedUrlCommand) {
+        printNFC("writeTag")
+        
+        guard #available(iOS 13.0, *) else {
+            sendError(command: command, result: "write is only available on iOS 13+")
+            return
+        }
+        guard let messagesJSON = command.argument(at: 0) as? [NSDictionary] else {
+            sendError(command: command, result: "No message to write")
+            return
+        }
+        
+        guard let tagReader = self.nfcController as? NFCTagReader else {
+            self.sendError(command: command, result: "no session available")
+            return
+        }
+        guard ((tagReader.comSession?.isReady) != nil) else {
+            self.sendError(command: command, result: "no session available")
+            return
+        }
+        
+        printNFC("write NDEF messages with \(messagesJSON.count) records")
+        
+        //convert message array to NFCNDEFMessage
+        var records: [NFCNDEFPayload] = []
+        for record in messagesJSON  {
+            let tnf: UInt8 = record["tnf"] as? UInt8 ?? 0
+            if let type = record["type"] as? [UInt8] {
+                if let id = record["id"] as? [UInt8] {
+                    if let payload = record["payload"] as? [UInt8] {
+                        records.append(
+                            NFCNDEFPayload(format: .init(rawValue: tnf) ?? .unknown, type: Data(type), identifier: Data(id), payload: Data(payload))
+                            )
+                    }
+                }
+
+            }
+        }
+        
+        DispatchQueue.main.async {
+            
+            tagReader.writeNDEF(message: .init(records: records), completed: {
+                (error:Error?) in
+                if (error != nil) {
+                    self.sendError(command: command, result: error!.localizedDescription)
+                    return
+                }
+                self.sendSuccess(command: command)
+            })
+            
+        }
     }
 
 }
