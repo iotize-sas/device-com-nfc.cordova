@@ -131,104 +131,117 @@ public class NfcPlugin extends CordovaPlugin {
 
     @Override
     public boolean execute(String action, JSONArray data, CallbackContext callbackContext) throws JSONException {
+        try {
+            Log.d(TAG, "execute " + action);
 
-        Log.d(TAG, "execute " + action);
+            // showSettings can be called if NFC is disabled
+            // might want to skip this if NO_NFC
+            if (action.equalsIgnoreCase(SHOW_SETTINGS)) {
+                showSettings(callbackContext);
+                return true;
+            }
 
-        // showSettings can be called if NFC is disabled
-        // might want to skip this if NO_NFC
-        if (action.equalsIgnoreCase(SHOW_SETTINGS)) {
-            showSettings(callbackContext);
+            // the channel is set up when the plugin starts
+            if (action.equalsIgnoreCase(CHANNEL)) {
+                channelCallback = callbackContext;
+                return true; // short circuit
+            }
+
+            if (!getNfcStatus().equals(STATUS_NFC_OK)) {
+                callbackContext.error(getNfcStatus());
+                return true; // short circuit
+            }
+
+            createPendingIntent();
+
+            if (action.equalsIgnoreCase(READER_MODE)) {
+                int flags = data.getInt(0);
+                readerMode(flags, callbackContext);
+
+            } else if (action.equalsIgnoreCase(REGISTER_MIME_TYPE)) {
+                registerMimeType(data, callbackContext);
+            } else if (action.equalsIgnoreCase(REGISTER_NFC_TAP_DEVICE)) {
+//            JSONObject jsonStringOptions = data.getJSONObject(0);
+                registerTapDevice(callbackContext);
+            } else if (action.equalsIgnoreCase(REMOVE_MIME_TYPE)) {
+                removeMimeType(data, callbackContext);
+
+            } else if (action.equalsIgnoreCase(REGISTER_NDEF)) {
+                registerNdef(callbackContext);
+            } else if (action.equalsIgnoreCase(REMOVE_NDEF)) {
+                removeNdef(callbackContext);
+
+            } else if (action.equalsIgnoreCase(REGISTER_NDEF_FORMATABLE)) {
+                registerNdefFormatable(callbackContext);
+
+            } else if (action.equals(REGISTER_DEFAULT_TAG)) {
+                registerDefaultTag(callbackContext);
+
+            } else if (action.equals(REMOVE_DEFAULT_TAG)) {
+                removeDefaultTag(callbackContext);
+
+            } else if (action.equalsIgnoreCase(WRITE_TAG)) {
+                writeTag(data, callbackContext);
+
+            } else if (action.equalsIgnoreCase(ERASE_TAG)) {
+                eraseTag(callbackContext);
+
+            } else if (action.equalsIgnoreCase(INIT)) {
+                init(callbackContext);
+
+            } else if (action.equalsIgnoreCase(ENABLED)) {
+                // status is checked before every call
+                // if code made it here, NFC is enabled
+                callbackContext.success(STATUS_NFC_OK);
+
+            } else if (action.equalsIgnoreCase(CONNECT_TAP)) {
+                String tech = data.getString(0);
+                int timeout = data.optInt(1, -1);
+                connectTap(tech, timeout, callbackContext);
+
+            } else if (action.equalsIgnoreCase(CONNECT_RAW)) {
+                String tech = data.getString(0);
+                int timeout = data.optInt(1, -1);
+                connectRaw(tech, timeout, callbackContext);
+
+            } else if (action.equalsIgnoreCase(TRANSCEIVE)) {
+                CordovaArgs args = new CordovaArgs(data); // execute is using the old signature with JSON data
+
+                byte[] command = args.getArrayBuffer(0);
+                transceiveRaw(command, callbackContext);
+
+            } else if (action.equalsIgnoreCase(TRANSCEIVE_TAP)) {
+                CordovaArgs args = new CordovaArgs(data); // execute is using the old signature with JSON data
+
+                byte[] command = args.getArrayBuffer(0);
+                transceiveTap(command, callbackContext);
+
+            } else if (action.equalsIgnoreCase(CLOSE)) {
+                close(callbackContext);
+
+            } else if (action.equalsIgnoreCase(SET_TAP_DEVICE_DISCOVERY_ENABLED)) {
+                CordovaArgs args = new CordovaArgs(data);
+                this._isTapDeviceDiscoveryEnabled = args.getBoolean(0);
+            } else {
+                // invalid action
+                callbackContext.error("Invalid NFC action \"" + action + "\"");
+                return false;
+            }
             return true;
         }
-
-        // the channel is set up when the plugin starts
-        if (action.equalsIgnoreCase(CHANNEL)) {
-            channelCallback = callbackContext;
-            return true; // short circuit
+        catch (SecurityException err) {
+            if (err.getMessage().startsWith("Permission Denial")) {
+                callbackContext.error("NFC Tag lost!");
+            }
+            else {
+                callbackContext.error(err.getMessage());
+            }
+            return true;
         }
-
-        if (!getNfcStatus().equals(STATUS_NFC_OK)) {
-            callbackContext.error(getNfcStatus());
-            return true; // short circuit
+        catch (Throwable err) {
+            callbackContext.error(err.getMessage());
+            return true;
         }
-
-        createPendingIntent();
-
-        if (action.equalsIgnoreCase(READER_MODE)) {
-            int flags = data.getInt(0);
-            readerMode(flags, callbackContext);
-
-        } else if (action.equalsIgnoreCase(REGISTER_MIME_TYPE)) {
-            registerMimeType(data, callbackContext);
-        } else if (action.equalsIgnoreCase(REGISTER_NFC_TAP_DEVICE)) {
-//            JSONObject jsonStringOptions = data.getJSONObject(0);
-            registerTapDevice(callbackContext);
-        } else if (action.equalsIgnoreCase(REMOVE_MIME_TYPE)) {
-            removeMimeType(data, callbackContext);
-
-        } else if (action.equalsIgnoreCase(REGISTER_NDEF)) {
-            registerNdef(callbackContext);
-        } else if (action.equalsIgnoreCase(REMOVE_NDEF)) {
-            removeNdef(callbackContext);
-
-        } else if (action.equalsIgnoreCase(REGISTER_NDEF_FORMATABLE)) {
-            registerNdefFormatable(callbackContext);
-
-        } else if (action.equals(REGISTER_DEFAULT_TAG)) {
-            registerDefaultTag(callbackContext);
-
-        } else if (action.equals(REMOVE_DEFAULT_TAG)) {
-            removeDefaultTag(callbackContext);
-
-        } else if (action.equalsIgnoreCase(WRITE_TAG)) {
-            writeTag(data, callbackContext);
-
-        } else if (action.equalsIgnoreCase(ERASE_TAG)) {
-            eraseTag(callbackContext);
-
-        } else if (action.equalsIgnoreCase(INIT)) {
-            init(callbackContext);
-
-        } else if (action.equalsIgnoreCase(ENABLED)) {
-            // status is checked before every call
-            // if code made it here, NFC is enabled
-            callbackContext.success(STATUS_NFC_OK);
-
-        } else if (action.equalsIgnoreCase(CONNECT_TAP)) {
-            String tech = data.getString(0);
-            int timeout = data.optInt(1, -1);
-            connectTap(tech, timeout, callbackContext);
-
-        } else if (action.equalsIgnoreCase(CONNECT_RAW)) {
-            String tech = data.getString(0);
-            int timeout = data.optInt(1, -1);
-            connectRaw(tech, timeout, callbackContext);
-
-        } else if (action.equalsIgnoreCase(TRANSCEIVE)) {
-            CordovaArgs args = new CordovaArgs(data); // execute is using the old signature with JSON data
-
-            byte[] command = args.getArrayBuffer(0);
-            transceiveRaw(command, callbackContext);
-
-        } else if (action.equalsIgnoreCase(TRANSCEIVE_TAP)) {
-            CordovaArgs args = new CordovaArgs(data); // execute is using the old signature with JSON data
-
-            byte[] command = args.getArrayBuffer(0);
-            transceiveTap(command, callbackContext);
-
-        } else if (action.equalsIgnoreCase(CLOSE)) {
-            close(callbackContext);
-
-        } else if (action.equalsIgnoreCase(SET_TAP_DEVICE_DISCOVERY_ENABLED)) {
-            CordovaArgs args = new CordovaArgs(data);
-            this._isTapDeviceDiscoveryEnabled = args.getBoolean(0);
-        } else {
-            // invalid action
-            callbackContext.error("Invalid NFC action \"" + action +"\"");
-            return false;
-        }
-
-        return true;
     }
 
     private String getNfcStatus() {
@@ -492,11 +505,9 @@ public class NfcPlugin extends CordovaPlugin {
                         callbackContext.error("Tag doesn't support NDEF");
                     }
                 }
-            } catch (FormatException e) {
-                callbackContext.error(e.getMessage());
-            } catch (TagLostException e) {
-                callbackContext.error(e.getMessage());
-            } catch (IOException e) {
+            } catch (SecurityException e) {
+                callbackContext.error("NFC Tag lost!");
+            } catch (Throwable e) {
                 callbackContext.error(e.getMessage());
             }
         });
@@ -1054,7 +1065,7 @@ public class NfcPlugin extends CordovaPlugin {
                 }
                 callbackContext.success();
 
-            } catch (Exception ex) {
+            } catch (Throwable ex) {
                 Log.e(TAG, "Error closing nfc connection", ex);
                 callbackContext.error("Error closing nfc connection " + ex.getLocalizedMessage());
             }
@@ -1142,7 +1153,7 @@ public class NfcPlugin extends CordovaPlugin {
                 }
                 byte[] response = nfcProtocol.send(data);
                 callbackContext.success(Helper.ByteArrayToHexString(response));
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 Log.e(TAG, e.getMessage(), e);
                 callbackContext.error(e.getMessage());
             }
