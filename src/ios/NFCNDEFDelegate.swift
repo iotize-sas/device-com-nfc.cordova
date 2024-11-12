@@ -68,7 +68,7 @@ extension NFCNDEFMessage {
     
     func ndefToNSDictionary(record: NFCNDEFPayload) -> NSDictionary {
         let dict = NSMutableDictionary()
-        dict.setObject([record.typeNameFormat.rawValue], forKey: "tnf" as NSString)
+        dict.setObject(record.typeNameFormat.rawValue, forKey: "tnf" as NSString)
         dict.setObject([UInt8](record.type), forKey: "type" as NSString)
         dict.setObject([UInt8](record.identifier), forKey: "id" as NSString)
         dict.setObject([UInt8](record.payload), forKey: "payload" as NSString)
