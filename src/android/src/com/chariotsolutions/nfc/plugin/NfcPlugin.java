@@ -508,7 +508,11 @@ public class NfcPlugin extends CordovaPlugin {
             } catch (SecurityException e) {
                 callbackContext.error("NFC Tag lost!");
             } catch (Throwable e) {
-                callbackContext.error(e.getMessage());
+                String errorMessage = e.getMessage();
+                if (errorMessage == null) {
+                    errorMessage = "NFC Tag lost!";
+                }
+                callbackContext.error(errorMessage);
             }
         });
     }
