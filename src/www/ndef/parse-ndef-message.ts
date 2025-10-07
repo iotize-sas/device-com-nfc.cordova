@@ -5,11 +5,11 @@ import { TNF, WellKnownType } from './definitions';
 import { asciiStringToByteBuffer } from '@iotize/common/byte-converter';
 
 export type NdefParsedRecord = {
-  tnf: string | number,
-  value?: any,
-  payload?: any
-  id: any[],
-  type: number[]
+  tnf: string | number;
+  value?: any;
+  payload?: any;
+  id: any[];
+  type: number[];
 };
 
 export function parseNdefMessages(messages: NdefRecord[] | undefined | null) {
@@ -104,7 +104,7 @@ function parseWellKnownType(message: Pick<NdefRecord, 'payload' | 'type'>) {
     const prefixCode = message.payload[0];
     let prefix: string =
       WELL_KNOWN_TYPE_URI_PREFIX[
-      prefixCode as keyof typeof WELL_KNOWN_TYPE_URI_PREFIX
+        prefixCode as keyof typeof WELL_KNOWN_TYPE_URI_PREFIX
       ] || '';
     return {
       type: 'uri',
@@ -130,7 +130,7 @@ function parseWellKnownType(message: Pick<NdefRecord, 'payload' | 'type'>) {
       type: 'text',
       value: Buffer.from(text).toString(encoding),
       encoding,
-      language: Buffer.from(language).toString(encoding)
+      language: Buffer.from(language).toString(encoding),
     };
   }
   //   else if (arrayEquals(message.type.slice(), WellKnownType.SMPART_POSTER)) {
@@ -203,35 +203,39 @@ function parseMimeType(message: Pick<NdefRecord, 'payload'>) {
 }
 
 function encodeWellKnownType(message: NdefParsedRecord) {
-
   if (message.value.type == 'uri') {
     //identify the prefix
     const prefixesEntries = Object.entries(WELL_KNOWN_TYPE_URI_PREFIX);
     let prefixByte = 0;
     for (const [id, prefix] of prefixesEntries) {
-      if (id == '0x0') // Skip first as it is always recognized. (what about 0x1 vs 0x2?)
+      if (id == '0x0')
+        // Skip first as it is always recognized. (what about 0x1 vs 0x2?)
         continue;
       if (message.value.value.startsWith(prefix)) {
         prefixByte = parseInt(id, 16);
         break;
       }
     }
-    const lengthToSlice = WELL_KNOWN_TYPE_URI_PREFIX[prefixByte as keyof typeof WELL_KNOWN_TYPE_URI_PREFIX].length;
+    const lengthToSlice =
+      WELL_KNOWN_TYPE_URI_PREFIX[
+        prefixByte as keyof typeof WELL_KNOWN_TYPE_URI_PREFIX
+      ].length;
     const slicedString = message.value.value.slice(lengthToSlice);
-    return [prefixByte, ...(asciiStringToByteBuffer(slicedString))];
-
+    return [prefixByte, ...asciiStringToByteBuffer(slicedString)];
   } else if (message.value.type === 'text') {
     // b1: RFU (set to 0)
     // b2-b7: la taille en octets de la langue (n)
     // B8-B8+n-1: language
     // Bn: message
     let firstByte = message.value.encoding == 'utf16le' ? 0b10000000 : 0;
-    firstByte &= (message.value.language & 0b00111111);
-    const languageBytes = Buffer.from(message.value.language, message.value.encoding);
+    firstByte &= message.value.language & 0b00111111;
+    const languageBytes = Buffer.from(
+      message.value.language,
+      message.value.encoding
+    );
     const textBytes = Buffer.from(message.value.value, message.value.encoding);
     return [firstByte, ...languageBytes, ...textBytes];
-  }
-  else return [...message.value.type, ...message.value.payload];
+  } else return [...message.value.type, ...message.value.payload];
 }
 
 function encodeExternalType(message: NdefParsedRecord) {
@@ -243,7 +247,7 @@ function encodeMimeType(message: NdefParsedRecord) {
 }
 
 export function encodeNDEFMessages(ndefRecords: NdefParsedRecord[]) {
-  return (ndefRecords || []).map(encodeNDEFMessage)
+  return (ndefRecords || []).map(encodeNDEFMessage);
 }
 
 export function encodeNDEFMessage(ndefRecord: NdefParsedRecord): NdefRecord {
@@ -253,7 +257,7 @@ export function encodeNDEFMessage(ndefRecord: NdefParsedRecord): NdefRecord {
         id: ndefRecord.id,
         type: ndefRecord.type,
         tnf: TNF.ABSOLUTE_URI,
-        payload: Array.from(asciiStringToByteBuffer(ndefRecord.value))
+        payload: Array.from(asciiStringToByteBuffer(ndefRecord.value)),
       };
     case 'wkt':
       return {
@@ -288,7 +292,7 @@ export function encodeNDEFMessage(ndefRecord: NdefParsedRecord): NdefRecord {
         id: ndefRecord.id,
         type: ndefRecord.type,
         tnf: TNF.RFU,
-        payload: ndefRecord.payload
+        payload: ndefRecord.payload,
       };
     case 'unchanged':
       return {
