@@ -579,6 +579,18 @@ var nfc = {
         return new Promise(function(resolve, reject) {
             cordova.exec(resolve,reject, 'NfcPlugin', 'endSession', []);
         })    
+    },
+
+    checkTapConnection: function(timeout) {
+        return new Promise(function(resolve, reject) {
+            if (cordova.platformId === 'android') {
+                const args = [timeout];
+                cordova.exec(resolve,reject, 'NfcPlugin', 'checkTapConnection', args);
+            }
+            else {
+                resolve();
+            }
+        })    
     }
     
 

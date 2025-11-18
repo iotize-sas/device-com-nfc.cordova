@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<plugin xmlns="http://www.phonegap.com/ns/plugins/1.0" 
+<plugin xmlns="http://www.phonegap.com/ns/plugins/1.0"
     xmlns:android="http://schemas.android.com/apk/res/android" id="@iotize/device-com-nfc.cordova" version="3.8.1">
 
     <name>@iotize/device-com-nfc.cordova</name>
@@ -33,13 +33,18 @@
         <source-file src="src/android/src/com/chariotsolutions/nfc/plugin/JSONBuilder.java" target-dir="src/com/chariotsolutions/nfc/plugin"/>
         <source-file src="src/android/src/com/chariotsolutions/nfc/plugin/PluginResponse.java" target-dir="src/com/chariotsolutions/nfc/plugin"/>
         <source-file src="src/android/src/com/chariotsolutions/nfc/plugin/NfcPluginError.java" target-dir="src/com/chariotsolutions/nfc/plugin"/>
+        <source-file src="src/android/src/com/chariotsolutions/nfc/plugin/NFCProtocol.java" target-dir="src/com/chariotsolutions/nfc/plugin"/>
+        <source-file src="src/android/src/com/chariotsolutions/nfc/plugin/NFCProtocolFactory.java" target-dir="src/com/chariotsolutions/nfc/plugin"/>
+        <source-file src="src/android/src/com/chariotsolutions/nfc/plugin/NFCIntentParser.java" target-dir="src/com/chariotsolutions/nfc/plugin"/>
+        <source-file src="src/android/src/com/chariotsolutions/nfc/plugin/NFC4Protocol.java" target-dir="src/com/chariotsolutions/nfc/plugin"/>
+        <source-file src="src/android/src/com/chariotsolutions/nfc/plugin/NFC5Protocol.java" target-dir="src/com/chariotsolutions/nfc/plugin"/>
 
         <config-file target="AndroidManifest.xml" parent="/manifest">
             <uses-permission android:name="android.permission.NFC"/>
             <uses-feature android:name="android.hardware.nfc" android:required="false"/>
         </config-file>
 
-        <config-file parent="/manifest/application/activity[@android:name='MainActivity']" target="AndroidManifest.xml" 
+        <config-file parent="/manifest/application/activity[@android:name='MainActivity']" target="AndroidManifest.xml"
             xmlns:android="http://schemas.android.com/apk/res/android">
             <intent-filter>
                 <action android:name="android.nfc.action.NDEF_DISCOVERED" />

@@ -44,4 +44,21 @@ export interface CordovaInterface {
   beginSessionFromTech(tech: string, alertMessage?: string): Promise<void>;
 
   endSession(): Promise<void>;
+
+  checkTapConnection(timeout: number): Promise<CheckTapConnectionResult>;
+}
+
+export enum CheckTapConnectionResult {
+  /**
+   * Tag is still in range, connection is not required
+   */
+  IN_RANGE_READY = 0,
+  /**
+   * Tag in range but it has left NFC field, we need to connect again
+   */
+  IN_RANGE_BUT_LEFT_FIELD = 1,
+  /**
+   * Tag not in range anymore, a new connection is required
+   */
+  NOT_IN_RANGE = 2,
 }

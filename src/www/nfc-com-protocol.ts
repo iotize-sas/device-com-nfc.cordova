@@ -10,9 +10,12 @@ import {
   ConnectionState,
 } from '@iotize/tap/protocol/api';
 import { QueueComProtocol } from '@iotize/tap/protocol/core';
-import { defer, Observable } from 'rxjs';
+import { catchError, defer, Observable, of, switchMap, throwError } from 'rxjs';
 
-import { CordovaInterface } from './cordova-interface';
+import {
+  CheckTapConnectionResult,
+  CordovaInterface,
+} from './cordova-interface';
 import { NfcError } from './errors';
 import { debug } from './logger';
 
@@ -73,7 +76,30 @@ export class NFCComProtocol extends QueueComProtocol {
    * @returns
    */
   connect(options?: ComProtocolConnectOptions): Observable<void> {
-    this.connectionState = ConnectionState.CONNECTING; // Hack to force NFC tag connect call even if we are already connected
+    if (this.connectionState === ConnectionState.CONNECTED) {
+      return defer(async () => {
+        try {
+          return await nfc.checkTapConnection(this.options.connect.timeout);
+        } catch (err) {
+          this.setConnectionState(ConnectionState.DISCONNECTED);
+          throw err;
+        }
+      }).pipe(
+        switchMap((connectionCheckState) => {
+          switch (connectionCheckState) {
+            case CheckTapConnectionResult.IN_RANGE_READY:
+              return of(undefined);
+            case CheckTapConnectionResult.IN_RANGE_BUT_LEFT_FIELD:
+              this.setConnectionState(ConnectionState.CONNECTING);
+              return super.connect(options);
+            case CheckTapConnectionResult.NOT_IN_RANGE:
+            default:
+              this.setConnectionState(ConnectionState.DISCONNECTED);
+              return throwError(() => NfcError.tagLostError());
+          }
+        })
+      );
+    }
     return super.connect(options);
   }
 

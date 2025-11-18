@@ -23,9 +23,6 @@ import android.widget.Toast;
 import com.iotize.android.communication.client.impl.EncryptionAlgo;
 import com.iotize.android.communication.client.impl.TapClient;
 import com.iotize.android.communication.client.impl.protocol.ProtocolFactory;
-import com.iotize.android.communication.protocol.nfc.NFCIntentParser;
-import com.iotize.android.communication.protocol.nfc.NFCProtocol;
-import com.iotize.android.communication.protocol.nfc.NFCProtocolFactory;
 import com.iotize.android.core.util.Helper;
 import com.iotize.android.device.device.impl.IoTizeDevice;
 
@@ -78,6 +75,7 @@ public class NfcPlugin extends CordovaPlugin {
     private static final String CLOSE = "close";
     private static final String TRANSCEIVE_TAP = "transceiveTap";
     private static final String TRANSCEIVE = "transceive";
+    private static final String CHECK_TAP_CONNECTION = "checkTapConnection";
 
     private static final String NFC_TAP_DEVICE = "nfc-tap-device";
     private static final String PREF_ENABLE_TAP_DEVICE_DISCOVERY = "EnableNFCTapDeviceDiscovery";
@@ -98,6 +96,12 @@ public class NfcPlugin extends CordovaPlugin {
 
     @Nullable
     private Class<?> tagTechnologyClass;
+
+    @Nullable
+    private Tag lastTag;
+
+    @Nullable
+    private String lastTechName;
 
     private static final String CHANNEL = "channel";
 
@@ -198,6 +202,10 @@ public class NfcPlugin extends CordovaPlugin {
                 String tech = data.getString(0);
                 int timeout = data.optInt(1, -1);
                 connectTap(tech, timeout, callbackContext);
+
+            } else if (action.equalsIgnoreCase(CHECK_TAP_CONNECTION)) {
+                int timeout = data.optInt(0, -1);
+                checkTapConnection(timeout, callbackContext);
 
             } else if (action.equalsIgnoreCase(CONNECT_RAW)) {
                 String tech = data.getString(0);
@@ -981,6 +989,41 @@ public class NfcPlugin extends CordovaPlugin {
         });
     }
 
+    private void checkTapConnection(final int timeout, final CallbackContext callbackContext) {
+        this.cordova.getThreadPool().execute(() -> {
+            try {
+                if (nfcProtocol == null) {
+                    callbackContext.success(2);
+                    return;
+                }
+                if (!tagTechnology.isConnected()) {
+                    if (nfcProtocol instanceof  NFC5Protocol) {
+                        ((NFC5Protocol) nfcProtocol)._connect();
+                    }
+                    else {
+                        tagTechnology.connect();
+                    }
+                }
+                callbackContext.success(0);
+            }  catch (SecurityException e) {
+                // new tag connection is required
+                Log.d(TAG, "tag leaves the field, a new tap connection is required");
+                callbackContext.success(1);
+            } catch (TagLostException e) {
+                Log.d(TAG, "tag is not in range anymore");
+                callbackContext.success(2);
+            } catch (Throwable e) {
+                Log.e(TAG, e.getMessage(), e);
+                try {
+                    this._close();
+                } catch (Exception ex) {
+                    Log.w(TAG, "cannot close properly", ex);
+                }
+                callbackContext.error(e.getMessage());
+            }
+        });
+    }
+
     /**
      * Perform Tap NFCProtocol connect call
      *
@@ -1016,6 +1059,7 @@ public class NfcPlugin extends CordovaPlugin {
     }
 
     private void _initIntentTag(final String tech) throws Exception {
+        Log.d(TAG, "Init tag: " + tech);
         Intent intent = getIntent();
         Tag tag = null;
         if (intent != null) {
@@ -1029,13 +1073,10 @@ public class NfcPlugin extends CordovaPlugin {
             Log.e(TAG, "No Tag");
             throw new Exception("No Tag");
         }
-
-        // get technologies supported by this tag
-        List<String> techList = Arrays.asList(tag.getTechList());
-        if (!techList.contains(tech)) {
-            throw new Exception("Tech " + tech + " not available");
+        if (lastTag == tag && lastTechName != null && lastTechName.equals(tech)) {
+            Log.d(TAG, "Same tag is already initialized with tech " + tech);
+            return;
         }
-        // use reflection to call the static function Tech.get(tag)
         tagTechnologyClass = Class.forName(tech);
         nfcProtocol = NFCProtocol.create(tag);
         Method method = tagTechnologyClass.getMethod("get", Tag.class);
@@ -1044,6 +1085,8 @@ public class NfcPlugin extends CordovaPlugin {
             Log.e(TAG, "No Tag Technology");
             throw new Exception("No Tag");
         }
+        lastTag = tag;
+        lastTechName = tech;
     }
 
     private void setTimeout(int timeout) {
@@ -1063,24 +1106,34 @@ public class NfcPlugin extends CordovaPlugin {
     private void close(CallbackContext callbackContext) {
         cordova.getThreadPool().execute(() -> {
             try {
-                _lastTechName = DEFAULT_NFC_TECH_CLASS_PASS;
-                if (nfcProtocol != null && nfcProtocol.isConnected()) {
-                    nfcProtocol.disconnect();
-                }
+                this._close();
                 callbackContext.success();
 
             } catch (Throwable ex) {
                 Log.e(TAG, "Error closing nfc connection", ex);
                 callbackContext.error("Error closing nfc connection " + ex.getLocalizedMessage());
             }
-            finally {
-                nfcProtocol = null;
-                tagTechnology = null;
-                tagTechnologyClass = null;
-            }
         });
     }
 
+    private void _close() throws Exception {
+        try {
+            _lastTechName = DEFAULT_NFC_TECH_CLASS_PASS;
+            if (nfcProtocol != null && nfcProtocol.isConnected()) {
+                nfcProtocol.disconnect();
+            }
+            else if (tagTechnology != null && tagTechnology.isConnected()) {
+                tagTechnology.close();
+            }
+        }
+        finally {
+            lastTag = null;
+            nfcProtocol = null;
+            tagTechnology = null;
+            tagTechnologyClass = null;
+            lastTechName = null;
+        }
+    }
     /**
      * Send raw commands to the tag and receive the response.
      *
