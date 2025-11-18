@@ -700,7 +700,7 @@ public class NfcPlugin extends CordovaPlugin {
 
                     if (action.equals(NfcAdapter.ACTION_NDEF_DISCOVERED)) {
                         Ndef ndef = Ndef.get(tag);
-                        fireNdefEvent(NDEF_MIME, ndef, messages);
+                        fireNdefEvent(NDEF, ndef, messages);
                         savedIntent = intent;
                         savedIntentTime = System.currentTimeMillis();
                         fireTagEvent(tag, messages);

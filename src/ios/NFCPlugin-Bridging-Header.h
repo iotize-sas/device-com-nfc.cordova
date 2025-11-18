@@ -4,4 +4,4 @@
 //
 //  (c) 2018 IoTize Solutions
 
-#import "../../../Classes/AppDelegate.h"
+#import "../../../AppDelegate.h"
