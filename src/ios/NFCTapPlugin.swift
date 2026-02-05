@@ -22,7 +22,8 @@ import CoreNFC
     
     override func pluginInitialize(){
         //Need to be initialized here, otherwise it is not set to true
-        self._isTapDiscoveryEnabled = true
+        // Why?? should only be set to true when we actually listen for them?
+        self._isTapDiscoveryEnabled = false
     }
     
     func sendSuccess(command: CDVInvokedUrlCommand) {

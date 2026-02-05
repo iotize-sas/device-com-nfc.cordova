@@ -19,7 +19,13 @@ class NFCTagReader : NSObject, NFCTagReaderSessionDelegate  {
 
     
     static var   DELAY : UInt32 = 1000;   // timeout resolution in millionths of second
-    static var   NB_MAX_RETRY : Int = 50;
+    static var   NB_MAX_RETRY : Int = 20;
+    
+    private var sessionRunning: Bool = false
+    
+    public func isSessionRunning() -> Bool {
+        return sessionRunning
+    }
     
     init(plugin: NfcPlugin) {
         self.plugin = plugin
@@ -35,10 +41,19 @@ class NFCTagReader : NSObject, NFCTagReaderSessionDelegate  {
     }
     
     func initSession( pollingOption: NFCTagReaderSession.PollingOption, alertMessage: String, completed: Completion?, onDiscover: CompletionWithJSONResponse? ) {
+        
         connectionCompleted = completed
         onDiscoverCompletion = onDiscover
         
-        if NFCNDEFReaderSession.readingAvailable {
+        if (isSessionRunning()) {
+            //reuse current session. Should reuse old completion?
+            comSession?.alertMessage = alertMessage
+            //pretend that session has started
+            if let actualInitSessionCompletion = initSessionCompletion {
+                actualInitSessionCompletion(nil)
+                initSessionCompletion = nil //do not keep session completion
+            }
+        } else if NFCNDEFReaderSession.readingAvailable {
             comSession = NFCTagReaderSession(pollingOption: pollingOption, delegate: self, queue: nil)
             comSession?.alertMessage = alertMessage
             comSession?.begin()
@@ -53,6 +68,7 @@ class NFCTagReader : NSObject, NFCTagReaderSessionDelegate  {
     }
 
     func invalidateSession( message :String) {
+        sessionRunning = false
         comSession?.alertMessage = message
         comSession?.invalidate()
         tag = nil
@@ -61,6 +77,7 @@ class NFCTagReader : NSObject, NFCTagReaderSessionDelegate  {
     func tagReaderSessionDidBecomeActive(_ session: NFCTagReaderSession) {
         // If necessary, you may perform additional operations on session start.
         // At this point RF polling is enabled.
+        sessionRunning = true
         if let actualInitSessionCompletion = initSessionCompletion {
             actualInitSessionCompletion(nil)
             initSessionCompletion = nil //do not keep session completion
@@ -75,6 +92,7 @@ class NFCTagReader : NSObject, NFCTagReaderSessionDelegate  {
        // If necessary, you may handle the error. Note session is no longer valid.
         // You must create a new session to restart RF polling.
         printNFC( "tagReaderSession:didInvalidateWithError - \(error)" )
+        sessionRunning = false
         if let actualInitSessionCompletion = initSessionCompletion {
             actualInitSessionCompletion(error)
             initSessionCompletion = nil //do not keep session completion
@@ -289,7 +307,7 @@ extension NFCTagReader {
                     completed( nil, error )
                     return
                 }
-                printNFC( "Com enabled" )
+                //printNFC( "Com enabled" )
                 self.sendRequest( request: request,
                     nbTry: NFCTagReader.NB_MAX_RETRY,
                     completed: { ( response: Data?, error: Error?) in
@@ -328,12 +346,20 @@ extension NFCTagReader {
             customRequestParameters:  parameters,
             completionHandler: { (response: Data?, error: Error?) in
                 if nil != error {
+                    if let nfcError = error as?  NFCReaderError {
+                        if nfcError.code == NFCReaderError.readerTransceiveErrorTagConnectionLost {
+                            // no need to keep trying
+                            self.invalidateSession( message: nfcError.localizedDescription  )
+                            completed(nil, nfcError )
+                            return
+                        }
+                    }
                     usleep(NFCTagReader.DELAY)
                     self.sendRequest( request: request, nbTry: nbTry - 1, completed: completed )
                     return
                 }
-                    usleep(NFCTagReader.DELAY * 10) // free ST25DV for SPI
-                    self.readResponse( nbTry: nbTry , completed: completed)
+                    usleep(NFCTagReader.DELAY * 30) // free ST25DV for SPI
+                    self.readResponse( nbTry: 20 , completed: completed)
             })
         
     }
@@ -364,7 +390,17 @@ extension NFCTagReader {
                           customRequestParameters:  Data(bytes: [UInt8(0x0D)], count: 1),
                           completionHandler: { (response: Data, error: Error?) in
                             if nil != error {
-                                usleep(NFCTagReader.DELAY)
+                                if let nfcError = error as?  NFCReaderError {
+                                    if nfcError.code == NFCReaderError.readerTransceiveErrorTagConnectionLost {
+                                        // no need to keep trying
+                                        self.invalidateSession( message: nfcError.localizedDescription  )
+                                        completed(nil, nfcError )
+                                        return
+                                    }
+                                }
+                                let sleepTime = 5 * UInt32(nbTry) * NFCTagReader.DELAY
+                                printNFC("sleep \(sleepTime)")
+                                usleep(sleepTime)
                                 self.readResponse( nbTry: nbTry - 1, completed: completed )
                                 return
                             }
@@ -390,7 +426,9 @@ extension NFCTagReader {
                                
                             }
                             else {
-                                usleep(NFCTagReader.DELAY)
+                                let sleepTime = 5 * UInt32(nbTry) * NFCTagReader.DELAY
+                                printNFC("sleep \(sleepTime)")
+                                usleep(sleepTime)
                                 self.readResponse( nbTry: nbTry - 1, completed: completed )
                             }
                         
@@ -427,6 +465,8 @@ extension NFCTagReader {
 
                 
                 let current = response[0];
+            
+            //printNFC("MB: \(current)")
                 
                 //We should reset mailbox
                 if ( (current != 0x41) && (current != 0x81) ) {

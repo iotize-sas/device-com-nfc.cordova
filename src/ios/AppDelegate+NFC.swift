@@ -36,8 +36,12 @@ extension AppDelegate {
                     if ( !nfcPluginInstance.isListeningNDEF ) {
                     Thread.sleep(forTimeInterval: waitingTimeInterval)
                     } else {
-                        let jsonDictionary = ndefMessage.ndefMessageToJSON()
-                        nfcPluginInstance.sendThroughChannel(jsonDictionary: jsonDictionary)
+                        let wrapper = NSMutableDictionary()
+                        wrapper.setValue(ndefMessage.toJSONRecords(), forKey: "ndefMessage")
+                        let returnedJSON = NSMutableDictionary()
+                        returnedJSON.setValue(wrapper, forKey: "tag")
+                        returnedJSON.setValue("tag", forKey: "type")
+                        nfcPluginInstance.sendThroughChannel(jsonDictionary: returnedJSON as! [AnyHashable : Any])
                         resolved = true
                         return
                     }
