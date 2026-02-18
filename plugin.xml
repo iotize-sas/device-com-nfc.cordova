@@ -12,6 +12,8 @@
     <issue>https://github.com/iotize-sas/device-com-nfc.cordova/issues</issue>
 
     <platform name="android">
+        <dependency id="@iotize/device-com-android-shared.cordova" version="0.0.3"/>
+
         <js-module src="www/phonegap-nfc.js" name="NFC">
             <runs />
         </js-module>
@@ -38,6 +40,8 @@
         <source-file src="src/android/src/com/chariotsolutions/nfc/plugin/NFCIntentParser.java" target-dir="src/com/chariotsolutions/nfc/plugin"/>
         <source-file src="src/android/src/com/chariotsolutions/nfc/plugin/NFC4Protocol.java" target-dir="src/com/chariotsolutions/nfc/plugin"/>
         <source-file src="src/android/src/com/chariotsolutions/nfc/plugin/NFC5Protocol.java" target-dir="src/com/chariotsolutions/nfc/plugin"/>
+
+        <source-file src="src/android/libs/iotize-device-com-nfc-1.0.0-alpha.9.aar" target-dir="libs"/>
 
         <config-file target="AndroidManifest.xml" parent="/manifest">
             <uses-permission android:name="android.permission.NFC"/>

@@ -3,14 +3,6 @@ repositories{
     flatDir {
         dirs 'libs'
     }
-    maven {
-        // Add iotize repository url
-        url "http://repo.iotize.com/artifactory/gradle-release"
-        allowInsecureProtocol = true
-        content {
-            includeGroupByRegex "com\\.iotize\\.android"
-        }
-    }
 }
 
 dependencies {
@@ -18,19 +10,10 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib:1.3.61"
     implementation 'org.apache.commons:commons-collections4:4.4'
 
-    // Add core library
-    implementation 'com.iotize.android:iotize-core:1.0.0-alpha.9'
-
-    // api
-    implementation 'com.iotize.android:iotize-device-api:1.0.0-alpha.9'
-    implementation 'com.iotize.android:iotize-client:1.0.0-alpha.9'
-    implementation 'com.iotize.android:iotize-device:1.0.0-alpha.9'
-
-    // NFC
-    implementation 'com.iotize.android:iotize-device-com-nfc:1.0.0-alpha.9'
-
     // RX
     implementation 'io.reactivex.rxjava2:rxandroid:2.1.0'
+
+    implementation fileTree(dir: 'libs', include: ['*.jar','*.aar'])
 
 }
 
